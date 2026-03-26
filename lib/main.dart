@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'features/sudoku/domain/sudoku_difficulty.dart';
+import 'features/sudoku/presentation/play_sudoku_page.dart';
+
 void main() {
   runApp(const MyApp());
 }
@@ -221,6 +224,21 @@ class QuickmatchPage extends StatefulWidget {
 class _QuickmatchPageState extends State<QuickmatchPage> {
   QuickmatchDifficulty _selectedDifficulty = QuickmatchDifficulty.easy;
 
+  SudokuDifficulty _mapToSudokuDifficulty(
+    QuickmatchDifficulty quickmatchDifficulty,
+  ) {
+    switch (quickmatchDifficulty) {
+      case QuickmatchDifficulty.easy:
+        return SudokuDifficulty.easy;
+      case QuickmatchDifficulty.medium:
+        return SudokuDifficulty.medium;
+      case QuickmatchDifficulty.hard:
+        return SudokuDifficulty.hard;
+      case QuickmatchDifficulty.extreme:
+        return SudokuDifficulty.extreme;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final AppLocalizations l10n = AppLocalizations.of(context)!;
@@ -265,7 +283,14 @@ class _QuickmatchPageState extends State<QuickmatchPage> {
           const SizedBox(height: 16),
           ElevatedButton(
             onPressed: () {
-              // TODO: Quickmatch game start logic will be implemented later.
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder:
+                      (BuildContext context) => PlaySudokuPage(
+                        difficulty: _mapToSudokuDifficulty(_selectedDifficulty),
+                      ),
+                ),
+              );
             },
             child: Text(l10n.quickmatchPlay),
           ),
