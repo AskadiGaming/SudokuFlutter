@@ -1,0 +1,17 @@
+﻿{
+  "@@locale": "it",
+  "tabDuell": "Duello",
+  "tabQuickmatch": "Partita rapida",
+  "tabSettings": "Impostazioni",
+  "pageDuell": "Duello",
+  "pageQuickmatch": "Partita rapida",
+  "pageSettings": "Impostazioni",
+  "quickmatchDifficultyLabel": "Difficoltà",
+  "quickmatchDifficultyEasy": "Facile",
+  "quickmatchDifficultyMedium": "Media",
+  "quickmatchDifficultyHard": "Difficile",
+  "quickmatchDifficultyExtreme": "Estrema",
+  "quickmatchPlay": "Gioca",
+  "settingsLanguageTitle": "Lingua",
+  "settingsLanguageLabel": "Lingua dell'app"
+}

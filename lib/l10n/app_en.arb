@@ -1,0 +1,17 @@
+﻿{
+  "@@locale": "en",
+  "tabDuell": "Duel",
+  "tabQuickmatch": "Quickmatch",
+  "tabSettings": "Settings",
+  "pageDuell": "Duel",
+  "pageQuickmatch": "Quickmatch",
+  "pageSettings": "Settings",
+  "quickmatchDifficultyLabel": "Difficulty",
+  "quickmatchDifficultyEasy": "Easy",
+  "quickmatchDifficultyMedium": "Medium",
+  "quickmatchDifficultyHard": "Hard",
+  "quickmatchDifficultyExtreme": "Extreme",
+  "quickmatchPlay": "Play",
+  "settingsLanguageTitle": "Language",
+  "settingsLanguageLabel": "App language"
+}

@@ -1,0 +1,83 @@
+# Implementierungsplan: Daily durch Quickmatch ersetzen
+
+## Ziel
+Der bisherige Bereich „Daily“ soll vollständig durch einen neuen Bereich „Quickmatch“ ersetzt werden. Auf dem Quickmatch-Bildschirm soll es:
+- ein Dropdown zur Auswahl der Schwierigkeit
+- einen Button „Spielen“
+geben.
+
+Die verfügbaren Schwierigkeiten sind:
+- Leicht
+- Mittel
+- Schwer
+- Extrem
+
+Der Button „Spielen“ soll in diesem Schritt bewusst noch keine Funktion auslösen.
+
+## Ausgangslage
+Aktuell existiert ein eigener Bereich „Daily“ in Navigation, Titel und/oder Seiteninhalt. Für Quickmatch gibt es noch keine UI-Struktur mit Schwierigkeitsauswahl.
+
+## Umsetzungsstrategie
+Wir setzen die Umstellung in vier klaren Schritten um:
+1. Daily-Bezeichnungen und Navigation auf Quickmatch umstellen
+2. Quickmatch-Seite mit Dropdown aufbauen
+3. „Spielen“-Button als Platzhalter ergänzen
+4. Texte/Lokalisierung und Verhalten validieren
+
+## Schritt-für-Schritt-Plan
+
+### 1. Navigation und Labels von Daily auf Quickmatch umstellen
+- Alle sichtbaren „Daily“-Beschriftungen durch „Quickmatch“ ersetzen (z. B. Tab-Label, Seitentitel).
+- Interne Bezeichner/Widgets, die klar Daily-spezifisch heißen, auf sinnvolle Quickmatch-Namen anpassen.
+- Sicherstellen, dass die Navigation weiterhin korrekt auf die neue Seite zeigt.
+
+Ergebnis:
+Der bisherige Daily-Bereich ist im UI vollständig durch Quickmatch ersetzt.
+
+### 2. Quickmatch-UI mit Schwierigkeit-Dropdown erstellen
+- Auf der Quickmatch-Seite ein Dropdown (z. B. `DropdownButtonFormField`) einbauen.
+- Genau diese Optionen bereitstellen:
+  - Leicht
+  - Mittel
+  - Schwer
+  - Extrem
+- Einen initialen Standardwert festlegen (empfohlen: „Leicht“).
+- Auswahl lokal im Widget-State halten (für den aktuellen Schritt ohne Persistenz).
+
+Ergebnis:
+Nutzerinnen und Nutzer können auf der Quickmatch-Seite eine Schwierigkeit auswählen.
+
+### 3. „Spielen“-Button hinzufügen (ohne Spiellogik)
+- Unter dem Dropdown einen gut sichtbaren Button mit Label „Spielen“ platzieren.
+- `onPressed` bewusst als Platzhalter umsetzen (z. B. leerer Callback oder TODO-Kommentar).
+- Keine Navigation oder Spielstart-Logik anbinden.
+
+Ergebnis:
+Der Button ist sichtbar und klickbar, löst aber absichtlich noch keine Funktion aus.
+
+### 4. Lokalisierung und Konsistenz anpassen
+- Falls Lokalisierung aktiv ist: neue/angepasste Strings in den ARB-Dateien ergänzen:
+  - Quickmatch-Tab/Seitentitel
+  - Dropdown-Label (z. B. „Schwierigkeit“)
+  - Schwierigkeitsoptionen
+  - „Spielen“-Button
+- Alte Daily-Strings entfernen oder ersetzen, sofern sie nicht mehr benötigt werden.
+- UI kurz manuell prüfen (Darstellung, Auswahlwechsel, keine Fehler bei Klick auf „Spielen“).
+
+Ergebnis:
+Quickmatch ist konsistent benannt und in der bestehenden Sprachstruktur korrekt integriert.
+
+## Betroffene Dateien (geplant)
+- `lib/main.dart`
+- `lib/l10n/app_de.arb`
+- ggf. weitere ARB-Dateien (z. B. `lib/l10n/app_en.arb`, `lib/l10n/app_es.arb`, ...)
+- optional: neue Widget-Datei für die Quickmatch-Seite (falls aus `main.dart` ausgelagert)
+- `docs/quickmatch.md`
+
+## Akzeptanzkriterien
+Das Feature gilt als umgesetzt, wenn:
+- Der Bereich „Daily“ im UI nicht mehr sichtbar ist und durch „Quickmatch“ ersetzt wurde.
+- Auf der Quickmatch-Seite ein Dropdown mit genau vier Optionen vorhanden ist: Leicht, Mittel, Schwer, Extrem.
+- Ein Button „Spielen“ sichtbar ist.
+- Der „Spielen“-Button derzeit keine Spiellogik ausführt.
+- Die relevanten Texte in der aktiven Lokalisierung korrekt angezeigt werden.
