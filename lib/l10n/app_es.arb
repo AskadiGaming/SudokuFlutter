@@ -15,6 +15,7 @@
   "quickmatchCrazyModeToggle": "Activar modo loco",
   "modifierNone": "Ningun modificador activo",
   "modifierShakingTitle": "Modificador de temblor",
+  "modifier360Title": "Modificador 360",
   "settingsLanguageTitle": "Idioma",
   "settingsLanguageLabel": "Idioma de la aplicacion"
 }

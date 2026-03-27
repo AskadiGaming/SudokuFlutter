@@ -20,11 +20,13 @@ class PlaySudokuPage extends StatefulWidget {
   State<PlaySudokuPage> createState() => _PlaySudokuPageState();
 }
 
-class _PlaySudokuPageState extends State<PlaySudokuPage> {
+class _PlaySudokuPageState extends State<PlaySudokuPage>
+    with SingleTickerProviderStateMixin {
   static const int _modifierSpawnMinSeconds = 8;
   static const int _modifierSpawnMaxSeconds = 20;
   static const int _modifierDurationMinSeconds = 3;
   static const int _modifierDurationMaxSeconds = 6;
+  static const int _rotationDurationSeconds = 10;
 
   late final SudokuPuzzleRepository _repository =
       widget.repository ?? LocalSudokuPuzzleRepository();
@@ -38,10 +40,12 @@ class _PlaySudokuPageState extends State<PlaySudokuPage> {
   Timer? _modifierEndTimer;
   Timer? _shakingTimer;
   Offset _gridShakeOffset = Offset.zero;
+  late final AnimationController _rotationController;
 
   @override
   void initState() {
     super.initState();
+    _rotationController = AnimationController(vsync: this);
     _loadPuzzle();
   }
 
@@ -116,17 +120,19 @@ class _PlaySudokuPageState extends State<PlaySudokuPage> {
       return;
     }
 
-    const SudokuModifierType nextModifier = SudokuModifierType.shaking;
-    final int durationSeconds = _randomBetweenInclusive(
-      _modifierDurationMinSeconds,
-      _modifierDurationMaxSeconds,
-    );
+    final List<SudokuModifierType> availableModifiers = <SudokuModifierType>[
+      SudokuModifierType.shaking,
+      SudokuModifierType.rotation360,
+    ];
+    final SudokuModifierType nextModifier =
+        availableModifiers[_random.nextInt(availableModifiers.length)];
+    final int durationSeconds = _durationSecondsForModifier(nextModifier);
 
     setState(() {
       _activeModifier = nextModifier;
     });
 
-    _startGridShaking();
+    _startModifierVisualEffect(nextModifier);
     _modifierEndTimer?.cancel();
     _modifierEndTimer = Timer(
       Duration(seconds: durationSeconds),
@@ -135,7 +141,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage> {
   }
 
   void _deactivateCurrentModifier() {
-    _stopGridShaking();
+    _stopModifierVisualEffects();
     if (!mounted) {
       return;
     }
@@ -146,6 +152,34 @@ class _PlaySudokuPageState extends State<PlaySudokuPage> {
     });
 
     _scheduleNextModifierActivation();
+  }
+
+  int _durationSecondsForModifier(SudokuModifierType modifier) {
+    switch (modifier) {
+      case SudokuModifierType.shaking:
+        return _randomBetweenInclusive(
+          _modifierDurationMinSeconds,
+          _modifierDurationMaxSeconds,
+        );
+      case SudokuModifierType.rotation360:
+        return _rotationDurationSeconds;
+    }
+  }
+
+  void _startModifierVisualEffect(SudokuModifierType modifier) {
+    switch (modifier) {
+      case SudokuModifierType.shaking:
+        _startGridShaking();
+        break;
+      case SudokuModifierType.rotation360:
+        _startGridRotation();
+        break;
+    }
+  }
+
+  void _stopModifierVisualEffects() {
+    _stopGridShaking();
+    _stopGridRotation();
   }
 
   void _startGridShaking() {
@@ -169,6 +203,20 @@ class _PlaySudokuPageState extends State<PlaySudokuPage> {
     _shakingTimer = null;
   }
 
+  void _startGridRotation() {
+    _rotationController
+      ..stop()
+      ..duration = const Duration(seconds: _rotationDurationSeconds)
+      ..reset()
+      ..forward();
+  }
+
+  void _stopGridRotation() {
+    _rotationController
+      ..stop()
+      ..reset();
+  }
+
   int _randomBetweenInclusive(int min, int max) {
     if (min == max) {
       return min;
@@ -188,6 +236,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage> {
     _modifierSpawnTimer?.cancel();
     _modifierEndTimer?.cancel();
     _shakingTimer?.cancel();
+    _rotationController.dispose();
     super.dispose();
   }
 
@@ -247,8 +296,15 @@ class _PlaySudokuPageState extends State<PlaySudokuPage> {
 
   Widget _buildModifierBanner(AppLocalizations? l10n) {
     String label = l10n?.modifierNone ?? 'No modifier active';
-    if (_activeModifier == SudokuModifierType.shaking) {
-      label = l10n?.modifierShakingTitle ?? 'Shaking Modifier';
+    switch (_activeModifier) {
+      case SudokuModifierType.shaking:
+        label = l10n?.modifierShakingTitle ?? 'Shaking Modifier';
+        break;
+      case SudokuModifierType.rotation360:
+        label = l10n?.modifier360Title ?? '360 Modifier';
+        break;
+      case null:
+        break;
     }
 
     return Card(
@@ -263,59 +319,76 @@ class _PlaySudokuPageState extends State<PlaySudokuPage> {
 
   Widget _buildGrid(BuildContext context, SudokuGridData gridData) {
     final ThemeData theme = Theme.of(context);
+    final bool isShaking = _activeModifier == SudokuModifierType.shaking;
+    final bool isRotating = _activeModifier == SudokuModifierType.rotation360;
 
-    return Transform.translate(
-      offset:
-          _activeModifier == SudokuModifierType.shaking
-              ? _gridShakeOffset
-              : Offset.zero,
-      child: GridView.builder(
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: 81,
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 9,
-        ),
-        itemBuilder: (BuildContext context, int index) {
-          final int row = index ~/ 9;
-          final int col = index % 9;
-          final int value = gridData.currentGrid[row][col];
-          final bool isFixed = gridData.isFixed[row][col];
-          final bool isHighlighted = value != 0 && value == _activeValue;
-
-          final Color baseColor =
-              isFixed
-                  ? theme.colorScheme.surfaceContainerHighest
-                  : theme.colorScheme.surface;
-          final Color backgroundColor =
-              isHighlighted ? theme.colorScheme.secondaryContainer : baseColor;
-
-          return InkWell(
-            onTap: () => _writeActiveNumberToCell(row, col),
-            child: Container(
-              key: Key('sudoku-cell-$row-$col'),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: backgroundColor,
-                border: _buildCellBorder(context, row, col),
-              ),
-              child:
-                  value == 0
-                      ? const SizedBox.shrink()
-                      : Text(
-                        '$value',
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight:
-                              isFixed ? FontWeight.bold : FontWeight.w500,
-                          color:
-                              isFixed
-                                  ? theme.colorScheme.onSurface
-                                  : theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-            ),
-          );
-        },
+    final Widget grid = GridView.builder(
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: 81,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 9,
       ),
+      itemBuilder: (BuildContext context, int index) {
+        final int row = index ~/ 9;
+        final int col = index % 9;
+        final int value = gridData.currentGrid[row][col];
+        final bool isFixed = gridData.isFixed[row][col];
+        final bool isHighlighted = value != 0 && value == _activeValue;
+
+        final Color baseColor =
+            isFixed
+                ? theme.colorScheme.surfaceContainerHighest
+                : theme.colorScheme.surface;
+        final Color backgroundColor =
+            isHighlighted ? theme.colorScheme.secondaryContainer : baseColor;
+
+        return InkWell(
+          onTap: () => _writeActiveNumberToCell(row, col),
+          child: Container(
+            key: Key('sudoku-cell-$row-$col'),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: backgroundColor,
+              border: _buildCellBorder(context, row, col),
+            ),
+            child:
+                value == 0
+                    ? const SizedBox.shrink()
+                    : Text(
+                      '$value',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: isFixed ? FontWeight.bold : FontWeight.w500,
+                        color:
+                            isFixed
+                                ? theme.colorScheme.onSurface
+                                : theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+          ),
+        );
+      },
+    );
+
+    final Widget withShaking = Transform.translate(
+      offset: isShaking ? _gridShakeOffset : Offset.zero,
+      child: grid,
+    );
+
+    if (!isRotating) {
+      return withShaking;
+    }
+
+    return AnimatedBuilder(
+      animation: _rotationController,
+      child: withShaking,
+      builder: (BuildContext context, Widget? child) {
+        return Transform.rotate(
+          angle: _rotationController.value * (2 * pi),
+          alignment: Alignment.center,
+          transformHitTests: true,
+          child: child,
+        );
+      },
     );
   }
 

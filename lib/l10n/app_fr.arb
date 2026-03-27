@@ -15,6 +15,7 @@
   "quickmatchCrazyModeToggle": "Activer le mode fou",
   "modifierNone": "Aucun modificateur actif",
   "modifierShakingTitle": "Modificateur secousse",
+  "modifier360Title": "Modificateur 360",
   "settingsLanguageTitle": "Langue",
   "settingsLanguageLabel": "Langue de l'application"
 }
