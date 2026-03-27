@@ -12,6 +12,9 @@
   "quickmatchDifficultyHard": "Schwer",
   "quickmatchDifficultyExtreme": "Extrem",
   "quickmatchPlay": "Spielen",
+  "quickmatchCrazyModeToggle": "Crazy Mode aktivieren",
+  "modifierNone": "Kein Modifier aktiv",
+  "modifierShakingTitle": "Shaking Modifier",
   "settingsLanguageTitle": "Sprache",
   "settingsLanguageLabel": "App-Sprache"
 }

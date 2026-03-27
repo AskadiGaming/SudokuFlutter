@@ -12,6 +12,9 @@
   "quickmatchDifficultyHard": "Hard",
   "quickmatchDifficultyExtreme": "Extreme",
   "quickmatchPlay": "Play",
+  "quickmatchCrazyModeToggle": "Enable Crazy Mode",
+  "modifierNone": "No modifier active",
+  "modifierShakingTitle": "Shaking Modifier",
   "settingsLanguageTitle": "Language",
   "settingsLanguageLabel": "App language"
 }

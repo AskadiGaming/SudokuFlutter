@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hello_world_app/features/sudoku/data/sudoku_puzzle_repository.dart';
 import 'package:hello_world_app/features/sudoku/domain/sudoku_difficulty.dart';
+import 'package:hello_world_app/features/sudoku/domain/sudoku_round_config.dart';
 import 'package:hello_world_app/features/sudoku/presentation/play_sudoku_page.dart';
 
 void main() {
@@ -11,7 +13,9 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: PlaySudokuPage(
-          difficulty: SudokuDifficulty.easy,
+          roundConfig: const SudokuRoundConfig(
+            difficulty: SudokuDifficulty.easy,
+          ),
           repository: _FakeRepository(),
         ),
       ),
@@ -43,7 +47,9 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: PlaySudokuPage(
-            difficulty: SudokuDifficulty.easy,
+            roundConfig: const SudokuRoundConfig(
+              difficulty: SudokuDifficulty.easy,
+            ),
             repository: _FakeRepository(),
           ),
         ),
@@ -103,7 +109,9 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: PlaySudokuPage(
-          difficulty: SudokuDifficulty.easy,
+          roundConfig: const SudokuRoundConfig(
+            difficulty: SudokuDifficulty.easy,
+          ),
           repository: _FakeRepository(),
         ),
       ),
@@ -146,6 +154,27 @@ void main() {
       ),
       findsOneWidget,
     );
+  });
+
+  testWidgets('shows modifier banner when crazy mode is enabled', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: PlaySudokuPage(
+          roundConfig: const SudokuRoundConfig(
+            difficulty: SudokuDifficulty.easy,
+            crazyModeEnabled: true,
+          ),
+          repository: _FakeRepository(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('modifier-banner')), findsOneWidget);
   });
 }
 

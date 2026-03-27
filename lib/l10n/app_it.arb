@@ -6,12 +6,15 @@
   "pageDuell": "Duello",
   "pageQuickmatch": "Partita rapida",
   "pageSettings": "Impostazioni",
-  "quickmatchDifficultyLabel": "Difficoltà",
+  "quickmatchDifficultyLabel": "Difficolta",
   "quickmatchDifficultyEasy": "Facile",
   "quickmatchDifficultyMedium": "Media",
   "quickmatchDifficultyHard": "Difficile",
   "quickmatchDifficultyExtreme": "Estrema",
   "quickmatchPlay": "Gioca",
+  "quickmatchCrazyModeToggle": "Attiva modalita folle",
+  "modifierNone": "Nessun modificatore attivo",
+  "modifierShakingTitle": "Modificatore tremolio",
   "settingsLanguageTitle": "Lingua",
   "settingsLanguageLabel": "Lingua dell'app"
 }

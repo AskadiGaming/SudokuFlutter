@@ -1,0 +1,1 @@
+enum SudokuModifierType { shaking }

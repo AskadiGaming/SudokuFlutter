@@ -1,17 +1,20 @@
 ﻿{
   "@@locale": "es",
   "tabDuell": "Duelo",
-  "tabQuickmatch": "Partida rápida",
+  "tabQuickmatch": "Partida rapida",
   "tabSettings": "Ajustes",
   "pageDuell": "Duelo",
-  "pageQuickmatch": "Partida rápida",
+  "pageQuickmatch": "Partida rapida",
   "pageSettings": "Ajustes",
   "quickmatchDifficultyLabel": "Dificultad",
-  "quickmatchDifficultyEasy": "Fácil",
+  "quickmatchDifficultyEasy": "Facil",
   "quickmatchDifficultyMedium": "Media",
-  "quickmatchDifficultyHard": "Difícil",
+  "quickmatchDifficultyHard": "Dificil",
   "quickmatchDifficultyExtreme": "Extrema",
   "quickmatchPlay": "Jugar",
+  "quickmatchCrazyModeToggle": "Activar modo loco",
+  "modifierNone": "Ningun modificador activo",
+  "modifierShakingTitle": "Modificador de temblor",
   "settingsLanguageTitle": "Idioma",
-  "settingsLanguageLabel": "Idioma de la aplicación"
+  "settingsLanguageLabel": "Idioma de la aplicacion"
 }

@@ -9,6 +9,7 @@ import 'features/ads/infrastructure/debug_analytics_service.dart';
 import 'features/ads/infrastructure/unity_ads_config.dart';
 import 'features/ads/infrastructure/unity_ads_service.dart';
 import 'features/sudoku/domain/sudoku_difficulty.dart';
+import 'features/sudoku/domain/sudoku_round_config.dart';
 import 'features/sudoku/presentation/play_sudoku_page.dart';
 
 void main() {
@@ -229,6 +230,7 @@ class QuickmatchPage extends StatefulWidget {
 
 class _QuickmatchPageState extends State<QuickmatchPage> {
   QuickmatchDifficulty _selectedDifficulty = QuickmatchDifficulty.easy;
+  bool _isCrazyModeEnabled = false;
   late final ShowAdBeforeRoundUseCase _showAdBeforeRoundUseCase;
   bool _isStartingRound = false;
 
@@ -287,7 +289,10 @@ class _QuickmatchPageState extends State<QuickmatchPage> {
       MaterialPageRoute<void>(
         builder:
             (BuildContext context) => PlaySudokuPage(
-              difficulty: _mapToSudokuDifficulty(_selectedDifficulty),
+              roundConfig: SudokuRoundConfig(
+                difficulty: _mapToSudokuDifficulty(_selectedDifficulty),
+                crazyModeEnabled: _isCrazyModeEnabled,
+              ),
             ),
       ),
     );
@@ -335,6 +340,17 @@ class _QuickmatchPageState extends State<QuickmatchPage> {
             },
           ),
           const SizedBox(height: 16),
+          SwitchListTile(
+            value: _isCrazyModeEnabled,
+            onChanged: (bool value) {
+              setState(() {
+                _isCrazyModeEnabled = value;
+              });
+            },
+            title: Text(l10n.quickmatchCrazyModeToggle),
+            contentPadding: EdgeInsets.zero,
+          ),
+          const SizedBox(height: 8),
           ElevatedButton(
             onPressed: _isStartingRound ? null : _startQuickmatchRound,
             child:
