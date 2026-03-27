@@ -1,0 +1,1 @@
+enum AdTimingMode { off, beforeRoundStart }

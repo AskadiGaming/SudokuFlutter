@@ -1,0 +1,57 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Flutter Android Debug (Unity Ads)",
+      "request": "launch",
+      "type": "dart",
+      "flutterMode": "debug",
+      "args": [
+        "--dart-define=UNITY_ADS_TEST_MODE=true",
+        "--dart-define=UNITY_ADS_ANDROID_GAME_ID_DEBUG=${env:UNITY_ADS_ANDROID_GAME_ID_DEBUG}",
+        "--dart-define=UNITY_ADS_ANDROID_INTERSTITIAL_PLACEMENT_ID_DEBUG=${env:UNITY_ADS_ANDROID_INTERSTITIAL_PLACEMENT_ID_DEBUG}",
+        "--dart-define=UNITY_ADS_IOS_GAME_ID_DEBUG=${env:UNITY_ADS_IOS_GAME_ID_DEBUG}",
+        "--dart-define=UNITY_ADS_IOS_INTERSTITIAL_PLACEMENT_ID_DEBUG=${env:UNITY_ADS_IOS_INTERSTITIAL_PLACEMENT_ID_DEBUG}"
+      ]
+    },
+    {
+      "name": "Flutter iOS Debug (Unity Ads)",
+      "request": "launch",
+      "type": "dart",
+      "flutterMode": "debug",
+      "args": [
+        "--dart-define=UNITY_ADS_TEST_MODE=true",
+        "--dart-define=UNITY_ADS_ANDROID_GAME_ID_DEBUG=${env:UNITY_ADS_ANDROID_GAME_ID_DEBUG}",
+        "--dart-define=UNITY_ADS_ANDROID_INTERSTITIAL_PLACEMENT_ID_DEBUG=${env:UNITY_ADS_ANDROID_INTERSTITIAL_PLACEMENT_ID_DEBUG}",
+        "--dart-define=UNITY_ADS_IOS_GAME_ID_DEBUG=${env:UNITY_ADS_IOS_GAME_ID_DEBUG}",
+        "--dart-define=UNITY_ADS_IOS_INTERSTITIAL_PLACEMENT_ID_DEBUG=${env:UNITY_ADS_IOS_INTERSTITIAL_PLACEMENT_ID_DEBUG}"
+      ]
+    },
+    {
+      "name": "Flutter Android Release (Unity Ads)",
+      "request": "launch",
+      "type": "dart",
+      "flutterMode": "release",
+      "args": [
+        "--dart-define=UNITY_ADS_TEST_MODE=false",
+        "--dart-define=UNITY_ADS_ANDROID_GAME_ID_RELEASE=${env:UNITY_ADS_ANDROID_GAME_ID_RELEASE}",
+        "--dart-define=UNITY_ADS_ANDROID_INTERSTITIAL_PLACEMENT_ID_RELEASE=${env:UNITY_ADS_ANDROID_INTERSTITIAL_PLACEMENT_ID_RELEASE}",
+        "--dart-define=UNITY_ADS_IOS_GAME_ID_RELEASE=${env:UNITY_ADS_IOS_GAME_ID_RELEASE}",
+        "--dart-define=UNITY_ADS_IOS_INTERSTITIAL_PLACEMENT_ID_RELEASE=${env:UNITY_ADS_IOS_INTERSTITIAL_PLACEMENT_ID_RELEASE}"
+      ]
+    },
+    {
+      "name": "Flutter iOS Release (Unity Ads)",
+      "request": "launch",
+      "type": "dart",
+      "flutterMode": "release",
+      "args": [
+        "--dart-define=UNITY_ADS_TEST_MODE=false",
+        "--dart-define=UNITY_ADS_ANDROID_GAME_ID_RELEASE=${env:UNITY_ADS_ANDROID_GAME_ID_RELEASE}",
+        "--dart-define=UNITY_ADS_ANDROID_INTERSTITIAL_PLACEMENT_ID_RELEASE=${env:UNITY_ADS_ANDROID_INTERSTITIAL_PLACEMENT_ID_RELEASE}",
+        "--dart-define=UNITY_ADS_IOS_GAME_ID_RELEASE=${env:UNITY_ADS_IOS_GAME_ID_RELEASE}",
+        "--dart-define=UNITY_ADS_IOS_INTERSTITIAL_PLACEMENT_ID_RELEASE=${env:UNITY_ADS_IOS_INTERSTITIAL_PLACEMENT_ID_RELEASE}"
+      ]
+    }
+  ]
+}

@@ -2,6 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'features/ads/application/show_ad_before_round_use_case.dart';
+import 'features/ads/domain/ad_policy.dart';
+import 'features/ads/domain/ad_timing_mode.dart';
+import 'features/ads/infrastructure/debug_analytics_service.dart';
+import 'features/ads/infrastructure/unity_ads_config.dart';
+import 'features/ads/infrastructure/unity_ads_service.dart';
 import 'features/sudoku/domain/sudoku_difficulty.dart';
 import 'features/sudoku/presentation/play_sudoku_page.dart';
 
@@ -223,6 +229,21 @@ class QuickmatchPage extends StatefulWidget {
 
 class _QuickmatchPageState extends State<QuickmatchPage> {
   QuickmatchDifficulty _selectedDifficulty = QuickmatchDifficulty.easy;
+  late final ShowAdBeforeRoundUseCase _showAdBeforeRoundUseCase;
+  bool _isStartingRound = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _showAdBeforeRoundUseCase = ShowAdBeforeRoundUseCase(
+      adService: UnityAdsService(config: UnityAdsConfig.fromEnvironment()),
+      analyticsService: DebugAnalyticsService(),
+      policy: const AdPolicy(
+        timingMode: AdTimingMode.beforeRoundStart,
+        minRoundsBetweenAds: 1,
+      ),
+    );
+  }
 
   SudokuDifficulty _mapToSudokuDifficulty(
     QuickmatchDifficulty quickmatchDifficulty,
@@ -237,6 +258,39 @@ class _QuickmatchPageState extends State<QuickmatchPage> {
       case QuickmatchDifficulty.extreme:
         return SudokuDifficulty.extreme;
     }
+  }
+
+  Future<void> _startQuickmatchRound() async {
+    if (_isStartingRound) {
+      return;
+    }
+
+    setState(() {
+      _isStartingRound = true;
+    });
+
+    try {
+      await _showAdBeforeRoundUseCase.execute();
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isStartingRound = false;
+        });
+      }
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder:
+            (BuildContext context) => PlaySudokuPage(
+              difficulty: _mapToSudokuDifficulty(_selectedDifficulty),
+            ),
+      ),
+    );
   }
 
   @override
@@ -282,17 +336,14 @@ class _QuickmatchPageState extends State<QuickmatchPage> {
           ),
           const SizedBox(height: 16),
           ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder:
-                      (BuildContext context) => PlaySudokuPage(
-                        difficulty: _mapToSudokuDifficulty(_selectedDifficulty),
-                      ),
-                ),
-              );
-            },
-            child: Text(l10n.quickmatchPlay),
+            onPressed: _isStartingRound ? null : _startQuickmatchRound,
+            child:
+                _isStartingRound
+                    ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                    : Text(l10n.quickmatchPlay),
           ),
         ],
       ),
