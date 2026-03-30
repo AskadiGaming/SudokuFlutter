@@ -35,6 +35,14 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
   static const int _modifierDurationMaxSeconds = 6;
   static const int _rotationDurationSeconds = 10;
   static const int _rotation90DurationSeconds = 8;
+  static const int _goatSpawnMinMilliseconds = 320;
+  static const int _goatSpawnMaxMilliseconds = 900;
+  static const double _goatMinSizePx = 64;
+  static const double _goatMaxSizePx = 128;
+  static const double _goatMinSpeedPxPerSecond = 85;
+  static const double _goatMaxSpeedPxPerSecond = 185;
+  static const int _maxVisibleGoats = 8;
+  static const String _goatAssetPath = 'assets/images/modifiers/goat.png';
 
   late final SudokuPuzzleRepository _repository =
       widget.repository ?? LocalSudokuPuzzleRepository();
@@ -47,7 +55,13 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
   Timer? _modifierSpawnTimer;
   Timer? _modifierEndTimer;
   Timer? _shakingTimer;
+  Timer? _goatSpawnTimer;
+  Timer? _goatMovementTimer;
   Offset _gridShakeOffset = Offset.zero;
+  Size _goatViewportSize = Size.zero;
+  DateTime? _lastGoatUpdate;
+  final List<_FlyingGoat> _flyingGoats = <_FlyingGoat>[];
+  int _nextGoatId = 0;
   int _quarterTurns = 0;
   bool _isApplying90Commit = false;
   late final AnimationController _rotationController;
@@ -137,6 +151,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
       SudokuModifierType.shaking,
       SudokuModifierType.rotation360,
       SudokuModifierType.rotation90,
+      SudokuModifierType.goat,
     ];
     final SudokuModifierType nextModifier =
         availableModifiers[_random.nextInt(availableModifiers.length)];
@@ -182,6 +197,11 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
         return _rotationDurationSeconds;
       case SudokuModifierType.rotation90:
         return _rotation90DurationSeconds;
+      case SudokuModifierType.goat:
+        return _randomBetweenInclusive(
+          _modifierDurationMinSeconds,
+          _modifierDurationMaxSeconds,
+        );
     }
   }
 
@@ -196,6 +216,9 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
       case SudokuModifierType.rotation90:
         _startGridRotation90();
         break;
+      case SudokuModifierType.goat:
+        _startGoatModifier();
+        break;
     }
   }
 
@@ -203,6 +226,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
     _stopGridShaking();
     _stopGridRotation();
     _stopGridRotation90();
+    _stopGoatModifier(clearGoats: true);
   }
 
   void _startGridShaking() {
@@ -290,6 +314,132 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
     _deactivateCurrentModifier();
   }
 
+  void _startGoatModifier() {
+    _stopGoatModifier(clearGoats: true);
+    _lastGoatUpdate = DateTime.now();
+    _goatMovementTimer = Timer.periodic(
+      const Duration(milliseconds: 16),
+      (_) => _updateGoats(),
+    );
+    _scheduleNextGoatSpawn();
+  }
+
+  void _scheduleNextGoatSpawn() {
+    _goatSpawnTimer?.cancel();
+    if (_activeModifier != SudokuModifierType.goat || !mounted) {
+      return;
+    }
+
+    final int delayMs = _randomBetweenInclusive(
+      _goatSpawnMinMilliseconds,
+      _goatSpawnMaxMilliseconds,
+    );
+    _goatSpawnTimer = Timer(Duration(milliseconds: delayMs), () {
+      if (!mounted || _activeModifier != SudokuModifierType.goat) {
+        return;
+      }
+      _spawnGoat();
+      _scheduleNextGoatSpawn();
+    });
+  }
+
+  void _spawnGoat() {
+    final Size viewport = _goatViewportSize;
+    if (viewport.height <= 0 || viewport.width <= 0) {
+      return;
+    }
+
+    final _GoatDirection direction =
+        _random.nextBool()
+            ? _GoatDirection.leftToRight
+            : _GoatDirection.rightToLeft;
+    final double size = _randomDoubleBetween(_goatMinSizePx, _goatMaxSizePx);
+    final double maxY = max(0, viewport.height - size);
+    final double y = _randomDoubleBetween(0, maxY);
+    final double speed = _randomDoubleBetween(
+      _goatMinSpeedPxPerSecond,
+      _goatMaxSpeedPxPerSecond,
+    );
+    final double startX =
+        direction == _GoatDirection.leftToRight
+            ? -(size * 0.6)
+            : viewport.width - (size * 0.4);
+
+    setState(() {
+      if (_flyingGoats.length >= _maxVisibleGoats) {
+        _flyingGoats.removeAt(0);
+      }
+      _flyingGoats.add(
+        _FlyingGoat(
+          id: _nextGoatId++,
+          direction: direction,
+          sizePx: size,
+          startY: y,
+          speedPxPerSecond: speed,
+          spawnTime: DateTime.now(),
+          x: startX,
+        ),
+      );
+    });
+  }
+
+  void _updateGoats() {
+    final DateTime now = DateTime.now();
+    final DateTime? lastTick = _lastGoatUpdate;
+    _lastGoatUpdate = now;
+    if (!mounted || _flyingGoats.isEmpty || lastTick == null) {
+      return;
+    }
+
+    final double deltaSeconds =
+        now.difference(lastTick).inMicroseconds /
+        Duration.microsecondsPerSecond;
+    if (deltaSeconds <= 0) {
+      return;
+    }
+
+    final double viewportWidth = _goatViewportSize.width;
+    if (viewportWidth <= 0) {
+      return;
+    }
+
+    setState(() {
+      for (int i = 0; i < _flyingGoats.length; i++) {
+        final _FlyingGoat goat = _flyingGoats[i];
+        final double distance = goat.speedPxPerSecond * deltaSeconds;
+        final double nextX =
+            goat.direction == _GoatDirection.leftToRight
+                ? goat.x + distance
+                : goat.x - distance;
+        _flyingGoats[i] = goat.copyWith(x: nextX);
+      }
+
+      _flyingGoats.removeWhere((_FlyingGoat goat) {
+        if (goat.direction == _GoatDirection.leftToRight) {
+          return goat.x > viewportWidth + goat.sizePx;
+        }
+        return goat.x + goat.sizePx < -goat.sizePx;
+      });
+    });
+  }
+
+  void _stopGoatModifier({required bool clearGoats}) {
+    _goatSpawnTimer?.cancel();
+    _goatSpawnTimer = null;
+    _goatMovementTimer?.cancel();
+    _goatMovementTimer = null;
+    _lastGoatUpdate = null;
+    if (clearGoats && _flyingGoats.isNotEmpty && mounted) {
+      setState(() {
+        _flyingGoats.clear();
+      });
+      return;
+    }
+    if (clearGoats) {
+      _flyingGoats.clear();
+    }
+  }
+
   int _randomBetweenInclusive(int min, int max) {
     if (min == max) {
       return min;
@@ -309,6 +459,8 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
     _modifierSpawnTimer?.cancel();
     _modifierEndTimer?.cancel();
     _shakingTimer?.cancel();
+    _goatSpawnTimer?.cancel();
+    _goatMovementTimer?.cancel();
     _rotation90Controller.removeStatusListener(_onRotation90StatusChanged);
     _rotationController.dispose();
     _rotation90Controller.dispose();
@@ -381,6 +533,9 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
       case SudokuModifierType.rotation90:
         label = l10n?.modifier90Title ?? '90° Modifier';
         break;
+      case SudokuModifierType.goat:
+        label = l10n?.modifierGoatTitle ?? 'Goat Modifier';
+        break;
       case null:
         break;
     }
@@ -401,6 +556,8 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
     final bool isRotating360 =
         _activeModifier == SudokuModifierType.rotation360;
     final bool isRotating90 = _activeModifier == SudokuModifierType.rotation90;
+    final bool showGoatOverlay =
+        _activeModifier == SudokuModifierType.goat || _flyingGoats.isNotEmpty;
 
     Widget buildGridContent() {
       final double rotation90Angle = _rotation90Controller.value * (pi / 2);
@@ -442,7 +599,8 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
                         child: Text(
                           '$value',
                           style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: isFixed ? FontWeight.bold : FontWeight.w500,
+                            fontWeight:
+                                isFixed ? FontWeight.bold : FontWeight.w500,
                             color:
                                 isFixed
                                     ? theme.colorScheme.onSurface
@@ -461,25 +619,95 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
       );
     }
 
-    if (!isRotating360 && !isRotating90) {
-      return buildGridContent();
+    Widget gridLayer() {
+      if (!isRotating360 && !isRotating90) {
+        return buildGridContent();
+      }
+
+      return AnimatedBuilder(
+        animation: Listenable.merge(<Listenable>[
+          _rotationController,
+          _rotation90Controller,
+        ]),
+        builder: (BuildContext context, Widget? child) {
+          final double angle =
+              isRotating360
+                  ? _rotationController.value * (2 * pi)
+                  : _rotation90Controller.value * (pi / 2);
+          return Transform.rotate(
+            angle: angle,
+            alignment: Alignment.center,
+            transformHitTests: true,
+            child: buildGridContent(),
+          );
+        },
+      );
     }
 
-    return AnimatedBuilder(
-      animation: Listenable.merge(<Listenable>[
-        _rotationController,
-        _rotation90Controller,
-      ]),
-      builder: (BuildContext context, Widget? child) {
-        final double angle =
-            isRotating360
-                ? _rotationController.value * (2 * pi)
-                : _rotation90Controller.value * (pi / 2);
-        return Transform.rotate(
-          angle: angle,
-          alignment: Alignment.center,
-          transformHitTests: true,
-          child: buildGridContent(),
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        _goatViewportSize = Size(constraints.maxWidth, constraints.maxHeight);
+        return Stack(
+          fit: StackFit.expand,
+          children: <Widget>[
+            gridLayer(),
+            if (showGoatOverlay)
+              Positioned.fill(
+                child: IgnorePointer(
+                  ignoring: true,
+                  child: Stack(
+                    key: const Key('goat-overlay'),
+                    children:
+                        _flyingGoats.map((_FlyingGoat goat) {
+                          final bool flipHorizontally =
+                              goat.direction == _GoatDirection.rightToLeft;
+                          return Positioned(
+                            left: goat.x,
+                            top: goat.startY,
+                            child: SizedBox(
+                              key: Key(
+                                'goat-${goat.id}-${goat.direction.name}',
+                              ),
+                              width: goat.sizePx,
+                              height: goat.sizePx,
+                              child: Transform(
+                                alignment: Alignment.center,
+                                transform:
+                                    flipHorizontally
+                                        ? Matrix4.diagonal3Values(-1, 1, 1)
+                                        : Matrix4.identity(),
+                                child: Image.asset(
+                                  _goatAssetPath,
+                                  key: Key('goat-image-${goat.id}'),
+                                  fit: BoxFit.contain,
+                                  errorBuilder:
+                                      (
+                                        BuildContext context,
+                                        Object error,
+                                        StackTrace? stackTrace,
+                                      ) {
+                                        debugPrint(
+                                          'Failed to load $_goatAssetPath: $error',
+                                        );
+                                        return const ColoredBox(
+                                          color: Color(0x44FF7043),
+                                          child: Center(
+                                            child: Icon(
+                                              Icons.pets,
+                                              color: Colors.brown,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                  ),
+                ),
+              ),
+          ],
         );
       },
     );
@@ -540,6 +768,40 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
     }
     return Center(
       child: Text('${index + 1}', key: Key('number-button-${index + 1}')),
+    );
+  }
+}
+
+enum _GoatDirection { leftToRight, rightToLeft }
+
+class _FlyingGoat {
+  const _FlyingGoat({
+    required this.id,
+    required this.direction,
+    required this.sizePx,
+    required this.startY,
+    required this.speedPxPerSecond,
+    required this.spawnTime,
+    required this.x,
+  });
+
+  final int id;
+  final _GoatDirection direction;
+  final double sizePx;
+  final double startY;
+  final double speedPxPerSecond;
+  final DateTime spawnTime;
+  final double x;
+
+  _FlyingGoat copyWith({double? x}) {
+    return _FlyingGoat(
+      id: id,
+      direction: direction,
+      sizePx: sizePx,
+      startY: startY,
+      speedPxPerSecond: speedPxPerSecond,
+      spawnTime: spawnTime,
+      x: x ?? this.x,
     );
   }
 }

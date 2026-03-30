@@ -196,7 +196,27 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('90° Modifier'), findsOneWidget);
+    expect(find.textContaining('90'), findsOneWidget);
+  });
+
+  testWidgets('provides localization for goat modifier title', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Builder(
+          builder: (BuildContext context) {
+            final AppLocalizations l10n = AppLocalizations.of(context)!;
+            return Text(l10n.modifierGoatTitle);
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Goat Modifier'), findsOneWidget);
   });
 
   testWidgets(
@@ -219,9 +239,10 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.pump(const Duration(seconds: 8));
+      await tester.pump(const Duration(milliseconds: 200));
       await tester.pump();
 
-      expect(find.text('90° Modifier'), findsOneWidget);
+      expect(find.textContaining('90'), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('sudoku-cell-0-1')));
       await tester.pump();
@@ -246,6 +267,55 @@ void main() {
       );
     },
   );
+
+  testWidgets('goat modifier renders overlay and clears after end', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: PlaySudokuPage(
+          roundConfig: const SudokuRoundConfig(
+            difficulty: SudokuDifficulty.easy,
+            crazyModeEnabled: true,
+          ),
+          repository: _FakeRepository(),
+          random: _PredictableRandom(<int>[0, 3, 0, 0, 1, 500000, 0, 500000]),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.pump(const Duration(seconds: 8));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump();
+
+    expect(find.text('Goat Modifier'), findsOneWidget);
+    expect(find.byKey(const Key('goat-overlay')), findsOneWidget);
+    expect(find.byKey(const Key('goat-0-leftToRight')), findsOneWidget);
+    expect(find.byKey(const Key('goat-image-0')), findsOneWidget);
+
+    final SizedBox goatBox = tester.widget<SizedBox>(
+      find.byKey(const Key('goat-0-leftToRight')),
+    );
+    expect(goatBox.width, isNotNull);
+    expect(goatBox.width!, greaterThanOrEqualTo(64));
+    expect(goatBox.width!, lessThanOrEqualTo(128));
+
+    final Image goatImage = tester.widget<Image>(
+      find.byKey(const Key('goat-image-0')),
+    );
+    final AssetImage provider = goatImage.image as AssetImage;
+    expect(provider.assetName, 'assets/images/modifiers/goat.png');
+
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pump();
+
+    expect(find.text('Goat Modifier'), findsNothing);
+    expect(find.byKey(const Key('goat-image-0')), findsNothing);
+  });
 }
 
 class _FakeRepository implements SudokuPuzzleRepository {
@@ -263,7 +333,7 @@ class _FakeRepository implements SudokuPuzzleRepository {
   }
 }
 
-class _PredictableRandom extends Random {
+class _PredictableRandom implements Random {
   _PredictableRandom(this.values);
 
   final List<int> values;

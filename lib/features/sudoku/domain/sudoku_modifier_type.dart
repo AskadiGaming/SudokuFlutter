@@ -1,1 +1,1 @@
-enum SudokuModifierType { shaking, rotation360, rotation90 }
+enum SudokuModifierType { shaking, rotation360, rotation90, goat }
