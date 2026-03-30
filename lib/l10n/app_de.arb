@@ -16,6 +16,8 @@
   "modifierNone": "Kein Modifier aktiv",
   "modifierShakingTitle": "Shaking Modifier",
   "modifier360Title": "360 Modifier",
+  "modifier90Title": "90° Modifier",
   "settingsLanguageTitle": "Sprache",
   "settingsLanguageLabel": "App-Sprache"
 }
+

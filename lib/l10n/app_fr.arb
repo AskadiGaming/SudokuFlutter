@@ -16,6 +16,8 @@
   "modifierNone": "Aucun modificateur actif",
   "modifierShakingTitle": "Modificateur secousse",
   "modifier360Title": "Modificateur 360",
+  "modifier90Title": "Modificateur 90°",
   "settingsLanguageTitle": "Langue",
   "settingsLanguageLabel": "Langue de l'application"
 }
+

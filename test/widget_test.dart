@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -176,6 +178,74 @@ void main() {
 
     expect(find.byKey(const Key('modifier-banner')), findsOneWidget);
   });
+
+  testWidgets('provides localization for 90 modifier title', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Builder(
+          builder: (BuildContext context) {
+            final AppLocalizations l10n = AppLocalizations.of(context)!;
+            return Text(l10n.modifier90Title);
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('90° Modifier'), findsOneWidget);
+  });
+
+  testWidgets(
+    '90 modifier keeps input interactive and commits rotated values',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: PlaySudokuPage(
+            roundConfig: const SudokuRoundConfig(
+              difficulty: SudokuDifficulty.easy,
+              crazyModeEnabled: true,
+            ),
+            repository: _FakeRepository(),
+            random: _PredictableRandom(<int>[0, 2]),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.pump(const Duration(seconds: 8));
+      await tester.pump();
+
+      expect(find.text('90° Modifier'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('sudoku-cell-0-1')));
+      await tester.pump();
+
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('sudoku-cell-0-1')),
+          matching: find.text('1'),
+        ),
+        findsOneWidget,
+      );
+
+      await tester.pump(const Duration(seconds: 8));
+      await tester.pump();
+
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('sudoku-cell-1-8')),
+          matching: find.text('1'),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
 }
 
 class _FakeRepository implements SudokuPuzzleRepository {
@@ -190,5 +260,24 @@ class _FakeRepository implements SudokuPuzzleRepository {
         '000000000'
         '000000000'
         '000000000';
+  }
+}
+
+class _PredictableRandom extends Random {
+  _PredictableRandom(this.values);
+
+  final List<int> values;
+  int _index = 0;
+
+  @override
+  bool nextBool() => nextInt(2) == 1;
+
+  @override
+  double nextDouble() => nextInt(1000000) / 1000000;
+
+  @override
+  int nextInt(int max) {
+    final int raw = _index < values.length ? values[_index++] : 0;
+    return raw % max;
   }
 }
