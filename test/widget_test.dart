@@ -219,6 +219,26 @@ void main() {
     expect(find.text('Goat Modifier'), findsOneWidget);
   });
 
+  testWidgets('provides localization for text rotation modifier title', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Builder(
+          builder: (BuildContext context) {
+            final AppLocalizations l10n = AppLocalizations.of(context)!;
+            return Text(l10n.modifierTextRotationTitle);
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Text Rotation Modifier'), findsOneWidget);
+  });
+
   testWidgets(
     '90 modifier keeps input interactive and commits rotated values',
     (WidgetTester tester) async {
@@ -315,6 +335,43 @@ void main() {
 
     expect(find.text('Goat Modifier'), findsNothing);
     expect(find.byKey(const Key('goat-image-0')), findsNothing);
+  });
+
+  testWidgets('text rotation modifier keeps input interactive', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: PlaySudokuPage(
+          roundConfig: const SudokuRoundConfig(
+            difficulty: SudokuDifficulty.easy,
+            crazyModeEnabled: true,
+          ),
+          repository: _FakeRepository(),
+          random: _PredictableRandom(<int>[0, 4, 1, 0]),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.pump(const Duration(seconds: 8));
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump();
+
+    expect(find.text('Text Rotation Modifier'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('sudoku-cell-0-1')));
+    await tester.pump();
+
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('sudoku-cell-0-1')),
+        matching: find.text('1'),
+      ),
+      findsOneWidget,
+    );
   });
 }
 

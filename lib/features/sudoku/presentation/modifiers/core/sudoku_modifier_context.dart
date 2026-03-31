@@ -25,6 +25,8 @@ class SudokuModifierContext {
     required void Function(DateTime? value) writeLastGoatUpdate,
     required this.rotationController,
     required this.rotation90Controller,
+    required this.textRotationController,
+    required this.textRotationDirections,
   }) : _tickerProvider = tickerProvider,
        _isMounted = isMounted,
        _scheduleSetState = scheduleSetState,
@@ -58,6 +60,8 @@ class SudokuModifierContext {
 
   final AnimationController rotationController;
   final AnimationController rotation90Controller;
+  final AnimationController textRotationController;
+  final Map<int, int> textRotationDirections;
 
   bool get mounted => _isMounted();
 

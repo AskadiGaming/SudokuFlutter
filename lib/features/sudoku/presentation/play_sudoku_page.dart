@@ -16,6 +16,7 @@ import 'modifiers/models/flying_goat.dart';
 import 'modifiers/rotation_360_modifier.dart';
 import 'modifiers/rotation_90_modifier.dart';
 import 'modifiers/shaking_modifier.dart';
+import 'modifiers/text_rotation_modifier.dart';
 import 'widgets/modifier_banner.dart';
 import 'widgets/number_pad.dart';
 import 'widgets/sudoku_grid.dart';
@@ -46,6 +47,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
 
   late final AnimationController _rotationController;
   late final AnimationController _rotation90Controller;
+  late final AnimationController _textRotationController;
   late final SudokuModifierContext _modifierContext;
   late final SudokuModifierRegistry _modifierRegistry;
   late final SudokuModifierScheduler _modifierScheduler;
@@ -60,6 +62,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
   final List<FlyingGoat> _flyingGoats = <FlyingGoat>[];
   int _nextGoatId = 0;
   int _quarterTurns = 0;
+  final Map<int, int> _textRotationDirections = <int, int>{};
   bool _modifierLifecycleStarted = false;
 
   @override
@@ -67,6 +70,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
     super.initState();
     _rotationController = AnimationController(vsync: this);
     _rotation90Controller = AnimationController(vsync: this);
+    _textRotationController = AnimationController(vsync: this);
 
     _modifierContext = SudokuModifierContext(
       random: _random,
@@ -92,6 +96,8 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
       },
       rotationController: _rotationController,
       rotation90Controller: _rotation90Controller,
+      textRotationController: _textRotationController,
+      textRotationDirections: _textRotationDirections,
     );
 
     _modifierRegistry = SudokuModifierRegistry(
@@ -100,6 +106,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
         Rotation360Modifier(),
         Rotation90Modifier(),
         GoatModifier(),
+        TextRotationModifier(),
       ],
     );
 
@@ -162,6 +169,14 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
 
     setState(() {
       gridData.currentGrid[row][col] = _activeValue;
+      if (_activeModifier == SudokuModifierType.textRotation &&
+          _activeValue != 0) {
+        final int index = (row * 9) + col;
+        _textRotationDirections.putIfAbsent(
+          index,
+          () => _random.nextBool() ? 1 : -1,
+        );
+      }
     });
   }
 
@@ -174,6 +189,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
     _modifierScheduler.dispose();
     _rotationController.dispose();
     _rotation90Controller.dispose();
+    _textRotationController.dispose();
     super.dispose();
   }
 
@@ -224,6 +240,8 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
                   quarterTurns: _quarterTurns,
                   rotationController: _rotationController,
                   rotation90Controller: _rotation90Controller,
+                  textRotationController: _textRotationController,
+                  textRotationDirections: _textRotationDirections,
                   flyingGoats: _flyingGoats,
                   goatAssetPath: _goatAssetPath,
                   onCellTapped: _writeActiveNumberToCell,

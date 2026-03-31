@@ -15,6 +15,8 @@ class SudokuGrid extends StatelessWidget {
     required this.quarterTurns,
     required this.rotationController,
     required this.rotation90Controller,
+    required this.textRotationController,
+    required this.textRotationDirections,
     required this.flyingGoats,
     required this.goatAssetPath,
     required this.onCellTapped,
@@ -29,6 +31,8 @@ class SudokuGrid extends StatelessWidget {
   final int quarterTurns;
   final AnimationController rotationController;
   final AnimationController rotation90Controller;
+  final AnimationController textRotationController;
+  final Map<int, int> textRotationDirections;
   final List<FlyingGoat> flyingGoats;
   final String goatAssetPath;
   final void Function(int row, int col) onCellTapped;
@@ -40,6 +44,8 @@ class SudokuGrid extends StatelessWidget {
     final bool isShaking = activeModifier == SudokuModifierType.shaking;
     final bool isRotating360 = activeModifier == SudokuModifierType.rotation360;
     final bool isRotating90 = activeModifier == SudokuModifierType.rotation90;
+    final bool isTextRotating =
+        activeModifier == SudokuModifierType.textRotation;
     final bool showGoatOverlay =
         activeModifier == SudokuModifierType.goat || flyingGoats.isNotEmpty;
 
@@ -56,6 +62,7 @@ class SudokuGrid extends StatelessWidget {
           final int row = index ~/ 9;
           final int col = index % 9;
           final int value = gridData.currentGrid[row][col];
+          final int direction = textRotationDirections[index] ?? 1;
           final bool isFixed = gridData.isFixed[row][col];
           final bool isHighlighted = value != 0 && value == activeValue;
 
@@ -79,7 +86,13 @@ class SudokuGrid extends StatelessWidget {
                   value == 0
                       ? const SizedBox.shrink()
                       : Transform.rotate(
-                        angle: isRotating90 ? -rotation90Angle : 0,
+                        angle:
+                            (isRotating90 ? -rotation90Angle : 0) +
+                            (isTextRotating
+                                ? direction *
+                                    textRotationController.value *
+                                    (2 * pi)
+                                : 0),
                         child: Text(
                           '$value',
                           style: theme.textTheme.titleLarge?.copyWith(
@@ -104,7 +117,7 @@ class SudokuGrid extends StatelessWidget {
     }
 
     Widget gridLayer() {
-      if (!isRotating360 && !isRotating90) {
+      if (!isRotating360 && !isRotating90 && !isTextRotating) {
         return buildGridContent();
       }
 
@@ -112,6 +125,7 @@ class SudokuGrid extends StatelessWidget {
         animation: Listenable.merge(<Listenable>[
           rotationController,
           rotation90Controller,
+          textRotationController,
         ]),
         builder: (BuildContext context, Widget? child) {
           final double angle =
