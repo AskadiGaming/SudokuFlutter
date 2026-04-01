@@ -209,3 +209,8 @@ Refactoring ist funktional stabil und regressionsarm.
 3. Danach Modifier-Core und Modifier-Dateien migrieren.
 
 So bleibt die Aenderung nachvollziehbar und das Risiko pro Schritt klein.
+
+## Guardrails fuer Modifier-Parameter
+- Neue Modifier duerfen keine versteckten Laufzeit-Hardcodes fuer Dauer/Spawn/Intensitaet enthalten.
+- Laufzeitparameter muessen zentral ueber `SudokuModifierGlobalConfig` gepflegt werden.
+- Scheduler-relevante Steuerung (`enabled`, `weight`) wird ausschliesslich ueber die globale Config vorgenommen.

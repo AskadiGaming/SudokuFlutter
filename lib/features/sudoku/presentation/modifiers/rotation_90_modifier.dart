@@ -1,12 +1,18 @@
+import 'dart:math';
+
 import 'package:flutter/animation.dart';
 
 import '../../domain/sudoku_matrix_rotation.dart';
+import '../../domain/sudoku_modifier_config.dart';
 import '../../domain/sudoku_modifier_type.dart';
 import 'core/sudoku_modifier.dart';
 import 'core/sudoku_modifier_context.dart';
 
 class Rotation90Modifier extends SudokuModifier {
-  static const int duration = 4;
+  Rotation90Modifier({required Rotation90ModifierConfig config})
+    : _config = config;
+
+  final Rotation90ModifierConfig _config;
 
   bool _isApplyingCommit = false;
   bool _isRunning = false;
@@ -18,19 +24,22 @@ class Rotation90Modifier extends SudokuModifier {
   @override
   bool get controlsOwnDeactivation => true;
 
+  int get _durationSeconds => max(1, _config.duration);
+
   @override
-  int durationSeconds(SudokuModifierContext context) => duration;
+  int durationSeconds(SudokuModifierContext context) => _durationSeconds;
 
   @override
   void onStart(SudokuModifierContext context) {
     _isApplyingCommit = false;
     _isRunning = true;
     _activeContext = context;
+    final int duration = _durationSeconds;
     context.rotation90Controller
       ..removeStatusListener(_onStatusChanged)
       ..addStatusListener(_onStatusChanged)
       ..stop()
-      ..duration = const Duration(seconds: duration)
+      ..duration = Duration(seconds: duration)
       ..reset()
       ..forward();
   }

@@ -3,21 +3,16 @@ import 'dart:math';
 
 import 'package:flutter/widgets.dart';
 
+import '../../domain/sudoku_modifier_config.dart';
 import '../../domain/sudoku_modifier_type.dart';
 import 'core/sudoku_modifier.dart';
 import 'core/sudoku_modifier_context.dart';
 import 'models/flying_goat.dart';
 
 class GoatModifier extends SudokuModifier {
-  static const int durationMinSeconds = 3;
-  static const int durationMaxSeconds = 6;
-  static const int spawnMinMilliseconds = 320;
-  static const int spawnMaxMilliseconds = 900;
-  static const double minSizePx = 64;
-  static const double maxSizePx = 128;
-  static const double minSpeedPxPerSecond = 85;
-  static const double maxSpeedPxPerSecond = 185;
-  static const int maxVisibleGoats = 8;
+  GoatModifier({required GoatModifierConfig config}) : _config = config;
+
+  final GoatModifierConfig _config;
 
   Timer? _goatSpawnTimer;
   Timer? _goatMovementTimer;
@@ -27,18 +22,19 @@ class GoatModifier extends SudokuModifier {
 
   @override
   int durationSeconds(SudokuModifierContext context) {
-    return context.randomBetweenInclusive(
-      durationMinSeconds,
-      durationMaxSeconds,
-    );
+    final int minSeconds = max(1, _config.duration.minSeconds);
+    final int maxSeconds = max(minSeconds, _config.duration.maxSeconds);
+    return context.randomBetweenInclusive(minSeconds, maxSeconds);
   }
 
   @override
   void onStart(SudokuModifierContext context) {
     _stopGoatModifier(context: context, clearGoats: true);
     context.lastGoatUpdate = DateTime.now();
+
+    final int movementTickMs = max(1, _config.movementTickMilliseconds);
     _goatMovementTimer = Timer.periodic(
-      const Duration(milliseconds: 16),
+      Duration(milliseconds: movementTickMs),
       (_) => _updateGoats(context),
     );
     _scheduleNextGoatSpawn(context);
@@ -55,10 +51,9 @@ class GoatModifier extends SudokuModifier {
       return;
     }
 
-    final int delayMs = context.randomBetweenInclusive(
-      spawnMinMilliseconds,
-      spawnMaxMilliseconds,
-    );
+    final int minSpawnMs = max(1, _config.spawnMinMilliseconds);
+    final int maxSpawnMs = max(minSpawnMs, _config.spawnMaxMilliseconds);
+    final int delayMs = context.randomBetweenInclusive(minSpawnMs, maxSpawnMs);
     _goatSpawnTimer = Timer(Duration(milliseconds: delayMs), () {
       if (!context.mounted) {
         return;
@@ -78,21 +73,33 @@ class GoatModifier extends SudokuModifier {
         context.random.nextBool()
             ? GoatDirection.leftToRight
             : GoatDirection.rightToLeft;
-    final double size = context.randomDoubleBetween(minSizePx, maxSizePx);
+    final double minSize = min(_config.minSizePx, _config.maxSizePx);
+    final double maxSize = max(_config.minSizePx, _config.maxSizePx);
+    final double size = context.randomDoubleBetween(minSize, maxSize);
     final double maxY = max(0, viewport.height - size);
     final double y = context.randomDoubleBetween(0, maxY);
-    final double speed = context.randomDoubleBetween(
-      minSpeedPxPerSecond,
-      maxSpeedPxPerSecond,
+
+    final double minSpeed = min(
+      _config.minSpeedPxPerSecond,
+      _config.maxSpeedPxPerSecond,
     );
+    final double maxSpeed = max(
+      _config.minSpeedPxPerSecond,
+      _config.maxSpeedPxPerSecond,
+    );
+    final double speed = context.randomDoubleBetween(minSpeed, maxSpeed);
+
+    final double leftFactor = max(0, _config.leftStartFactor);
+    final double rightFactor = max(0, _config.rightStartFactor);
     final double startX =
         direction == GoatDirection.leftToRight
-            ? -(size * 0.6)
-            : viewport.width - (size * 0.4);
+            ? -(size * leftFactor)
+            : viewport.width - (size * rightFactor);
 
     context.safeSetState(() {
       final List<FlyingGoat> goats = context.flyingGoats;
-      if (goats.length >= maxVisibleGoats) {
+      final int maxVisible = max(1, _config.maxVisibleGoats);
+      if (goats.length >= maxVisible) {
         goats.removeAt(0);
       }
       goats.add(

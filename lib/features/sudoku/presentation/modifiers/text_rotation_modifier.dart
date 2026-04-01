@@ -1,15 +1,23 @@
+import 'dart:math';
+
+import '../../domain/sudoku_modifier_config.dart';
 import '../../domain/sudoku_modifier_type.dart';
 import 'core/sudoku_modifier.dart';
 import 'core/sudoku_modifier_context.dart';
 
 class TextRotationModifier extends SudokuModifier {
-  static const int duration = 6;
+  TextRotationModifier({required TextRotationModifierConfig config})
+    : _config = config;
+
+  final TextRotationModifierConfig _config;
 
   @override
   SudokuModifierType get type => SudokuModifierType.textRotation;
 
+  int get _durationSeconds => max(1, _config.duration);
+
   @override
-  int durationSeconds(SudokuModifierContext context) => duration;
+  int durationSeconds(SudokuModifierContext context) => _durationSeconds;
 
   @override
   void onStart(SudokuModifierContext context) {
@@ -29,9 +37,10 @@ class TextRotationModifier extends SudokuModifier {
       }
     }
 
+    final int duration = _durationSeconds;
     context.textRotationController
       ..stop()
-      ..duration = const Duration(seconds: duration)
+      ..duration = Duration(seconds: duration)
       ..reset()
       ..forward();
   }

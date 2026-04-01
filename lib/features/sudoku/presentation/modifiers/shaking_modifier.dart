@@ -1,13 +1,16 @@
 import 'dart:async';
+import 'dart:math';
 import 'dart:ui';
 
+import '../../domain/sudoku_modifier_config.dart';
 import '../../domain/sudoku_modifier_type.dart';
 import 'core/sudoku_modifier.dart';
 import 'core/sudoku_modifier_context.dart';
 
 class ShakingModifier extends SudokuModifier {
-  static const int durationMinSeconds = 3;
-  static const int durationMaxSeconds = 6;
+  ShakingModifier({required ShakingModifierConfig config}) : _config = config;
+
+  final ShakingModifierConfig _config;
 
   Timer? _shakingTimer;
 
@@ -16,23 +19,25 @@ class ShakingModifier extends SudokuModifier {
 
   @override
   int durationSeconds(SudokuModifierContext context) {
-    return context.randomBetweenInclusive(
-      durationMinSeconds,
-      durationMaxSeconds,
-    );
+    final int minSeconds = max(1, _config.duration.minSeconds);
+    final int maxSeconds = max(minSeconds, _config.duration.maxSeconds);
+    return context.randomBetweenInclusive(minSeconds, maxSeconds);
   }
 
   @override
   void onStart(SudokuModifierContext context) {
     _shakingTimer?.cancel();
-    _shakingTimer = Timer.periodic(const Duration(milliseconds: 55), (_) {
+    final int tickMs = max(1, _config.tickMilliseconds);
+    final double minOffset = min(_config.minOffsetPx, _config.maxOffsetPx);
+    final double maxOffset = max(_config.minOffsetPx, _config.maxOffsetPx);
+    _shakingTimer = Timer.periodic(Duration(milliseconds: tickMs), (_) {
       if (!context.mounted) {
         return;
       }
       context.safeSetState(() {
         context.gridShakeOffset = Offset(
-          context.randomDoubleBetween(-4.0, 4.0),
-          context.randomDoubleBetween(-4.0, 4.0),
+          context.randomDoubleBetween(minOffset, maxOffset),
+          context.randomDoubleBetween(minOffset, maxOffset),
         );
       });
     });

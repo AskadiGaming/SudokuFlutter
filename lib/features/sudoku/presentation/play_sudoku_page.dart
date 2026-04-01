@@ -4,19 +4,16 @@ import 'package:flutter/material.dart';
 
 import '../data/local_sudoku_puzzle_repository.dart';
 import '../data/sudoku_puzzle_repository.dart';
+import '../domain/default_sudoku_modifier_config.dart';
 import '../domain/sudoku_grid_parser.dart';
+import '../domain/sudoku_modifier_config.dart';
 import '../domain/sudoku_modifier_type.dart';
 import '../domain/sudoku_round_config.dart';
 import 'modifiers/core/sudoku_modifier_context.dart';
-import 'modifiers/core/sudoku_modifier.dart';
+import 'modifiers/core/sudoku_modifier_factory.dart';
 import 'modifiers/core/sudoku_modifier_registry.dart';
 import 'modifiers/core/sudoku_modifier_scheduler.dart';
-import 'modifiers/goat_modifier.dart';
 import 'modifiers/models/flying_goat.dart';
-import 'modifiers/rotation_360_modifier.dart';
-import 'modifiers/rotation_90_modifier.dart';
-import 'modifiers/shaking_modifier.dart';
-import 'modifiers/text_rotation_modifier.dart';
 import 'widgets/modifier_banner.dart';
 import 'widgets/number_pad.dart';
 import 'widgets/sudoku_grid.dart';
@@ -48,6 +45,8 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
   late final AnimationController _rotationController;
   late final AnimationController _rotation90Controller;
   late final AnimationController _textRotationController;
+  late final SudokuModifierGlobalConfig _modifierConfig =
+      defaultSudokuModifierGlobalConfig;
   late final SudokuModifierContext _modifierContext;
   late final SudokuModifierRegistry _modifierRegistry;
   late final SudokuModifierScheduler _modifierScheduler;
@@ -100,19 +99,13 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
       textRotationDirections: _textRotationDirections,
     );
 
-    _modifierRegistry = SudokuModifierRegistry(
-      modifiers: <SudokuModifier>[
-        ShakingModifier(),
-        Rotation360Modifier(),
-        Rotation90Modifier(),
-        GoatModifier(),
-        TextRotationModifier(),
-      ],
-    );
+    _modifierRegistry =
+        SudokuModifierFactory(config: _modifierConfig).buildRegistry();
 
     _modifierScheduler = SudokuModifierScheduler(
       registry: _modifierRegistry,
       context: _modifierContext,
+      config: _modifierConfig,
       onModifierChanged: (SudokuModifierType? modifier) {
         _activeModifier = modifier;
       },
