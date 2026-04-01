@@ -1,13 +1,16 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 import '../data/local_sudoku_puzzle_repository.dart';
 import '../data/sudoku_puzzle_repository.dart';
 import '../dev/admin_test_sudoku_override.dart';
 import '../domain/admin_test_sudoku_config.dart';
 import '../domain/default_sudoku_modifier_config.dart';
+import '../domain/sudoku_finish_logic.dart';
 import '../domain/sudoku_grid_parser.dart';
 import '../domain/sudoku_modifier_config.dart';
 import '../domain/sudoku_modifier_type.dart';
@@ -25,6 +28,7 @@ import 'widgets/sudoku_grid.dart';
 class PlaySudokuPage extends StatefulWidget {
   const PlaySudokuPage({
     required this.roundConfig,
+    this.onReplayRoundRequested,
     this.repository,
     this.adminTestOverrideConfig,
     this.adminTestOverrideEnabled,
@@ -33,6 +37,11 @@ class PlaySudokuPage extends StatefulWidget {
   });
 
   final SudokuRoundConfig roundConfig;
+  final Future<void> Function(
+    BuildContext context,
+    SudokuRoundConfig roundConfig,
+  )?
+  onReplayRoundRequested;
   final SudokuPuzzleRepository? repository;
   final AdminTestSudokuConfig? adminTestOverrideConfig;
   final bool? adminTestOverrideEnabled;
@@ -45,6 +54,8 @@ class PlaySudokuPage extends StatefulWidget {
 class _PlaySudokuPageState extends State<PlaySudokuPage>
     with TickerProviderStateMixin {
   static const String _goatAssetPath = 'assets/images/modifiers/goat.png';
+  static const Duration _finishStepDelay = Duration(milliseconds: 45);
+  static final List<int> _spiralOrder = buildSpiralOrder9x9();
 
   late final SudokuPuzzleRepository _repository =
       widget.repository ?? LocalSudokuPuzzleRepository();
@@ -71,6 +82,11 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
   int _quarterTurns = 0;
   final Map<int, int> _textRotationDirections = <int, int>{};
   bool _modifierLifecycleStarted = false;
+  bool _isSolved = false;
+  bool _isFinishSequenceRunning = false;
+  bool _showSolvedOverlay = false;
+  bool _isReplayStarting = false;
+  final Set<int> _hiddenCellIndices = <int>{};
 
   @override
   void initState() {
@@ -131,8 +147,14 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
       }
       setState(() {
         _gridData = parsed;
+        _isSolved = false;
+        _isFinishSequenceRunning = false;
+        _showSolvedOverlay = false;
+        _isReplayStarting = false;
+        _hiddenCellIndices.clear();
       });
       _startModifierLifecycleIfNeeded();
+      _checkSolvedAndMaybeStartFinishSequence();
     } catch (error) {
       if (!mounted) {
         return;
@@ -185,10 +207,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
   }
 
   bool get _isRunningUnderTest {
-    final WidgetsBinding? binding = WidgetsBinding.instance;
-    if (binding == null) {
-      return false;
-    }
+    final WidgetsBinding binding = WidgetsBinding.instance;
     return binding.runtimeType.toString().contains('Test');
   }
 
@@ -204,6 +223,9 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
   }
 
   void _setActiveValue(int value) {
+    if (_isInteractionLocked) {
+      return;
+    }
     setState(() {
       _activeValue = value;
     });
@@ -211,7 +233,9 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
 
   void _writeActiveNumberToCell(int row, int col) {
     final SudokuGridData? gridData = _gridData;
-    if (gridData == null || gridData.isFixed[row][col]) {
+    if (_isInteractionLocked ||
+        gridData == null ||
+        gridData.isFixed[row][col]) {
       return;
     }
 
@@ -226,10 +250,108 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
         );
       }
     });
+    _checkSolvedAndMaybeStartFinishSequence();
   }
 
   void _updateGoatViewport(Size viewportSize) {
     _goatViewportSize = viewportSize;
+  }
+
+  bool get _isInteractionLocked =>
+      _isFinishSequenceRunning || _showSolvedOverlay || _isReplayStarting;
+
+  void _checkSolvedAndMaybeStartFinishSequence() {
+    final SudokuGridData? gridData = _gridData;
+    if (gridData == null || _isSolved || _isFinishSequenceRunning) {
+      return;
+    }
+    if (!isGridSolved(gridData)) {
+      return;
+    }
+    unawaited(_runFinishSequence());
+  }
+
+  Future<void> _runFinishSequence() async {
+    if (_isFinishSequenceRunning || _showSolvedOverlay) {
+      return;
+    }
+
+    _modifierScheduler.stop();
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isSolved = true;
+      _isFinishSequenceRunning = true;
+      _activeModifier = null;
+      _gridShakeOffset = Offset.zero;
+      _hiddenCellIndices.clear();
+      _flyingGoats.clear();
+    });
+
+    for (final int index in _spiralOrder) {
+      await Future<void>.delayed(_finishStepDelay);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _hiddenCellIndices.add(index);
+      });
+    }
+
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _isFinishSequenceRunning = false;
+      _showSolvedOverlay = true;
+    });
+  }
+
+  Future<void> _startReplayRound() async {
+    if (_isReplayStarting) {
+      return;
+    }
+
+    setState(() {
+      _isReplayStarting = true;
+    });
+
+    try {
+      final Future<void> Function(
+        BuildContext context,
+        SudokuRoundConfig roundConfig,
+      )?
+      replayStarter = widget.onReplayRoundRequested;
+      if (replayStarter != null) {
+        await replayStarter(context, widget.roundConfig);
+        return;
+      }
+
+      if (!mounted) {
+        return;
+      }
+      await Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(
+          builder:
+              (BuildContext context) => PlaySudokuPage(
+                roundConfig: widget.roundConfig,
+                onReplayRoundRequested: widget.onReplayRoundRequested,
+                repository: widget.repository,
+                adminTestOverrideConfig: widget.adminTestOverrideConfig,
+                adminTestOverrideEnabled: widget.adminTestOverrideEnabled,
+                random: widget.random,
+              ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isReplayStarting = false;
+        });
+      }
+    }
   }
 
   @override
@@ -280,20 +402,28 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
               constraints: const BoxConstraints(maxWidth: 420),
               child: AspectRatio(
                 aspectRatio: 1,
-                child: SudokuGrid(
-                  gridData: gridData,
-                  activeValue: _activeValue,
-                  activeModifier: _activeModifier,
-                  gridShakeOffset: _gridShakeOffset,
-                  quarterTurns: _quarterTurns,
-                  rotationController: _rotationController,
-                  rotation90Controller: _rotation90Controller,
-                  textRotationController: _textRotationController,
-                  textRotationDirections: _textRotationDirections,
-                  flyingGoats: _flyingGoats,
-                  goatAssetPath: _goatAssetPath,
-                  onCellTapped: _writeActiveNumberToCell,
-                  onViewportChanged: _updateGoatViewport,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: <Widget>[
+                    SudokuGrid(
+                      gridData: gridData,
+                      activeValue: _activeValue,
+                      activeModifier: _activeModifier,
+                      gridShakeOffset: _gridShakeOffset,
+                      quarterTurns: _quarterTurns,
+                      rotationController: _rotationController,
+                      rotation90Controller: _rotation90Controller,
+                      textRotationController: _textRotationController,
+                      textRotationDirections: _textRotationDirections,
+                      flyingGoats: _flyingGoats,
+                      goatAssetPath: _goatAssetPath,
+                      onCellTapped: _writeActiveNumberToCell,
+                      onViewportChanged: _updateGoatViewport,
+                      hiddenCellIndices: _hiddenCellIndices,
+                      interactionEnabled: !_isInteractionLocked,
+                    ),
+                    if (_showSolvedOverlay) _buildSolvedOverlay(context),
+                  ],
                 ),
               ),
             ),
@@ -302,9 +432,43 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
         const SizedBox(height: 16),
         SudokuNumberPad(
           activeValue: _activeValue,
+          enabled: !_isInteractionLocked,
           onValueSelected: _setActiveValue,
         ),
       ],
+    );
+  }
+
+  Widget _buildSolvedOverlay(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final AppLocalizations? l10n = AppLocalizations.of(context);
+    return Positioned.fill(
+      child: Container(
+        color: theme.colorScheme.surface.withValues(alpha: 0.9),
+        padding: const EdgeInsets.all(16),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Text(
+                l10n?.sudokuSolvedTitle ?? 'Sudoku solved',
+                style: theme.textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _isReplayStarting ? null : _startReplayRound,
+                child:
+                    _isReplayStarting
+                        ? const SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                        : Text(l10n?.sudokuPlayAgain ?? 'Play again'),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -21,6 +21,8 @@ class SudokuGrid extends StatelessWidget {
     required this.goatAssetPath,
     required this.onCellTapped,
     required this.onViewportChanged,
+    this.hiddenCellIndices = const <int>{},
+    this.interactionEnabled = true,
     super.key,
   });
 
@@ -37,6 +39,8 @@ class SudokuGrid extends StatelessWidget {
   final String goatAssetPath;
   final void Function(int row, int col) onCellTapped;
   final ValueChanged<Size> onViewportChanged;
+  final Set<int> hiddenCellIndices;
+  final bool interactionEnabled;
 
   @override
   Widget build(BuildContext context) {
@@ -61,6 +65,7 @@ class SudokuGrid extends StatelessWidget {
         itemBuilder: (BuildContext context, int index) {
           final int row = index ~/ 9;
           final int col = index % 9;
+          final bool isHidden = hiddenCellIndices.contains(index);
           final int value = gridData.currentGrid[row][col];
           final int direction = textRotationDirections[index] ?? 1;
           final bool isFixed = gridData.isFixed[row][col];
@@ -73,38 +78,48 @@ class SudokuGrid extends StatelessWidget {
           final Color backgroundColor =
               isHighlighted ? theme.colorScheme.secondaryContainer : baseColor;
 
-          return InkWell(
-            onTap: () => onCellTapped(row, col),
-            child: Container(
-              key: Key('sudoku-cell-$row-$col'),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: backgroundColor,
-                border: _buildCellBorder(context, row, col),
-              ),
-              child:
-                  value == 0
-                      ? const SizedBox.shrink()
-                      : Transform.rotate(
-                        angle:
-                            (isRotating90 ? -rotation90Angle : 0) +
-                            (isTextRotating
-                                ? direction *
-                                    textRotationController.value *
-                                    (2 * pi)
-                                : 0),
-                        child: Text(
-                          '$value',
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight:
-                                isFixed ? FontWeight.bold : FontWeight.w500,
-                            color:
-                                isFixed
-                                    ? theme.colorScheme.onSurface
-                                    : theme.colorScheme.onSurfaceVariant,
+          return AnimatedOpacity(
+            opacity: isHidden ? 0 : 1,
+            duration: const Duration(milliseconds: 120),
+            child: IgnorePointer(
+              ignoring: !interactionEnabled || isHidden,
+              child: InkWell(
+                onTap:
+                    interactionEnabled && !isHidden
+                        ? () => onCellTapped(row, col)
+                        : null,
+                child: Container(
+                  key: Key('sudoku-cell-$row-$col'),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: backgroundColor,
+                    border: _buildCellBorder(context, row, col),
+                  ),
+                  child:
+                      value == 0
+                          ? const SizedBox.shrink()
+                          : Transform.rotate(
+                            angle:
+                                (isRotating90 ? -rotation90Angle : 0) +
+                                (isTextRotating
+                                    ? direction *
+                                        textRotationController.value *
+                                        (2 * pi)
+                                    : 0),
+                            child: Text(
+                              '$value',
+                              style: theme.textTheme.titleLarge?.copyWith(
+                                fontWeight:
+                                    isFixed ? FontWeight.bold : FontWeight.w500,
+                                color:
+                                    isFixed
+                                        ? theme.colorScheme.onSurface
+                                        : theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
+                ),
+              ),
             ),
           );
         },

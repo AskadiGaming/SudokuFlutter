@@ -75,10 +75,14 @@ class Rotation90Modifier extends SudokuModifier {
     _isApplyingCommit = true;
     context.safeSetState(() {
       final rotatedGrid = rotateMatrixClockwise90<int>(gridData.currentGrid);
+      final rotatedSolution = rotateMatrixClockwise90<int>(
+        gridData.solutionGrid,
+      );
       final rotatedFixed = rotateMatrixClockwise90<bool>(gridData.isFixed);
       for (int row = 0; row < 9; row++) {
         for (int col = 0; col < 9; col++) {
           gridData.currentGrid[row][col] = rotatedGrid[row][col];
+          gridData.solutionGrid[row][col] = rotatedSolution[row][col];
           gridData.isFixed[row][col] = rotatedFixed[row][col];
         }
       }

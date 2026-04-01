@@ -20,5 +20,7 @@
   "modifierGoatTitle": "Goat Modifier",
   "modifierTextRotationTitle": "Text Rotation Modifier",
   "settingsLanguageTitle": "Sprache",
-  "settingsLanguageLabel": "App-Sprache"
+  "settingsLanguageLabel": "App-Sprache",
+  "sudokuSolvedTitle": "Sudoku gelöst",
+  "sudokuPlayAgain": "Erneut spielen"
 }

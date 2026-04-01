@@ -12,6 +12,8 @@ void main() {
     expect(gridData.initialGrid.first.length, 9);
     expect(gridData.currentGrid[0][0], 5);
     expect(gridData.currentGrid[0][2], 0);
+    expect(gridData.solutionGrid[0][2], 4);
+    expect(gridData.solutionGrid[8][8], 9);
     expect(gridData.isFixed[0][0], isTrue);
     expect(gridData.isFixed[0][2], isFalse);
   });

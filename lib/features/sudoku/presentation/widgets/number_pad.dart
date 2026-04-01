@@ -4,11 +4,13 @@ class SudokuNumberPad extends StatelessWidget {
   const SudokuNumberPad({
     required this.activeValue,
     required this.onValueSelected,
+    this.enabled = true,
     super.key,
   });
 
   final int activeValue;
   final ValueChanged<int> onValueSelected;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +32,10 @@ class SudokuNumberPad extends StatelessWidget {
               (int index) => activeValue == _valueForButtonIndex(index),
             ),
             onPressed:
-                (int index) => onValueSelected(_valueForButtonIndex(index)),
+                enabled
+                    ? (int index) =>
+                        onValueSelected(_valueForButtonIndex(index))
+                    : null,
             children: List<Widget>.generate(
               10,
               (int index) => _buildButtonLabel(index),
