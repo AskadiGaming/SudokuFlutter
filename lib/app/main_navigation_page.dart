@@ -67,7 +67,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
             label: l10n.tabDuell,
           ),
           BottomNavigationBarItem(
-            icon: const Icon(Icons.today),
+            icon: const Icon(Icons.timer_outlined),
             label: l10n.tabQuickmatch,
           ),
           BottomNavigationBarItem(
