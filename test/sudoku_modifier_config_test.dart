@@ -23,5 +23,25 @@ void main() {
         throwsArgumentError,
       );
     });
+
+    test('rejects invalid rain opacity range', () {
+      expect(
+        () => RainModifierConfig(
+          runtime: ModifierRuntimeConfig(enabled: true, weight: 1),
+          duration: DurationRangeConfig(minSeconds: 3, maxSeconds: 5),
+          spawnMinMilliseconds: 30,
+          spawnMaxMilliseconds: 70,
+          movementTickMilliseconds: 16,
+          minDropLengthPx: 10,
+          maxDropLengthPx: 20,
+          minSpeedPxPerSecond: 300,
+          maxSpeedPxPerSecond: 500,
+          maxVisibleDrops: 60,
+          minOpacity: 0.7,
+          maxOpacity: 0.5,
+        ),
+        throwsArgumentError,
+      );
+    });
   });
 }

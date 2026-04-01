@@ -10,6 +10,7 @@ import 'package:hello_world_app/features/sudoku/presentation/modifiers/core/sudo
 import 'package:hello_world_app/features/sudoku/presentation/modifiers/core/sudoku_modifier_registry.dart';
 import 'package:hello_world_app/features/sudoku/presentation/modifiers/core/sudoku_modifier_scheduler.dart';
 import 'package:hello_world_app/features/sudoku/presentation/modifiers/models/flying_goat.dart';
+import 'package:hello_world_app/features/sudoku/presentation/modifiers/models/rain_drop.dart';
 
 void main() {
   group('SudokuModifierScheduler', () {
@@ -105,6 +106,11 @@ class _SchedulerHarness {
       readAndIncrementNextGoatId: () => 0,
       readLastGoatUpdate: () => null,
       writeLastGoatUpdate: (_) {},
+      readRainViewportSize: () => Size.zero,
+      readRainDrops: () => <RainDrop>[],
+      readAndIncrementNextRainDropId: () => 0,
+      readLastRainUpdate: () => null,
+      writeLastRainUpdate: (_) {},
       rotationController: _rotationController,
       rotation90Controller: _rotation90Controller,
       textRotationController: _textRotationController,
@@ -173,6 +179,20 @@ SudokuModifierGlobalConfig _buildConfig({
       maxSpeedPxPerSecond: 185,
       maxVisibleGoats: 8,
       movementTickMilliseconds: 16,
+    ),
+    rain: RainModifierConfig(
+      runtime: ModifierRuntimeConfig(enabled: false, weight: 0),
+      duration: DurationRangeConfig(minSeconds: 3, maxSeconds: 6),
+      spawnMinMilliseconds: 30,
+      spawnMaxMilliseconds: 70,
+      movementTickMilliseconds: 16,
+      minDropLengthPx: 10,
+      maxDropLengthPx: 24,
+      minSpeedPxPerSecond: 320,
+      maxSpeedPxPerSecond: 640,
+      maxVisibleDrops: 140,
+      minOpacity: 0.2,
+      maxOpacity: 0.55,
     ),
     textRotation: TextRotationModifierConfig(
       runtime: ModifierRuntimeConfig(enabled: false, weight: 0),

@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 
 import '../../../domain/sudoku_grid_parser.dart';
 import '../models/flying_goat.dart';
+import '../models/rain_drop.dart';
 
 class SudokuModifierContext {
   SudokuModifierContext({
@@ -23,6 +24,11 @@ class SudokuModifierContext {
     required int Function() readAndIncrementNextGoatId,
     required DateTime? Function() readLastGoatUpdate,
     required void Function(DateTime? value) writeLastGoatUpdate,
+    required Size Function() readRainViewportSize,
+    required List<RainDrop> Function() readRainDrops,
+    required int Function() readAndIncrementNextRainDropId,
+    required DateTime? Function() readLastRainUpdate,
+    required void Function(DateTime? value) writeLastRainUpdate,
     required this.rotationController,
     required this.rotation90Controller,
     required this.textRotationController,
@@ -41,7 +47,12 @@ class SudokuModifierContext {
        _readFlyingGoats = readFlyingGoats,
        _readAndIncrementNextGoatId = readAndIncrementNextGoatId,
        _readLastGoatUpdate = readLastGoatUpdate,
-       _writeLastGoatUpdate = writeLastGoatUpdate;
+       _writeLastGoatUpdate = writeLastGoatUpdate,
+       _readRainViewportSize = readRainViewportSize,
+       _readRainDrops = readRainDrops,
+       _readAndIncrementNextRainDropId = readAndIncrementNextRainDropId,
+       _readLastRainUpdate = readLastRainUpdate,
+       _writeLastRainUpdate = writeLastRainUpdate;
 
   final Random random;
   final TickerProvider _tickerProvider;
@@ -58,6 +69,11 @@ class SudokuModifierContext {
   final int Function() _readAndIncrementNextGoatId;
   final DateTime? Function() _readLastGoatUpdate;
   final void Function(DateTime? value) _writeLastGoatUpdate;
+  final Size Function() _readRainViewportSize;
+  final List<RainDrop> Function() _readRainDrops;
+  final int Function() _readAndIncrementNextRainDropId;
+  final DateTime? Function() _readLastRainUpdate;
+  final void Function(DateTime? value) _writeLastRainUpdate;
 
   final AnimationController rotationController;
   final AnimationController rotation90Controller;
@@ -88,6 +104,16 @@ class SudokuModifierContext {
   DateTime? get lastGoatUpdate => _readLastGoatUpdate();
 
   set lastGoatUpdate(DateTime? value) => _writeLastGoatUpdate(value);
+
+  Size get rainViewportSize => _readRainViewportSize();
+
+  List<RainDrop> get rainDrops => _readRainDrops();
+
+  int consumeNextRainDropId() => _readAndIncrementNextRainDropId();
+
+  DateTime? get lastRainUpdate => _readLastRainUpdate();
+
+  set lastRainUpdate(DateTime? value) => _writeLastRainUpdate(value);
 
   void safeSetState(VoidCallback callback) {
     if (!mounted) {

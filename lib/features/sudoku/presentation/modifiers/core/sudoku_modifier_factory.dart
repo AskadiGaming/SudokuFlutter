@@ -1,5 +1,6 @@
 import '../../../domain/sudoku_modifier_config.dart';
 import '../goat_modifier.dart';
+import '../rain_modifier.dart';
 import '../rotation_360_modifier.dart';
 import '../rotation_90_modifier.dart';
 import '../shaking_modifier.dart';
@@ -19,6 +20,7 @@ class SudokuModifierFactory {
       Rotation360Modifier(config: config.rotation360),
       Rotation90Modifier(config: config.rotation90),
       GoatModifier(config: config.goat),
+      RainModifier(config: config.rain),
       TextRotationModifier(config: config.textRotation),
       SplitModifier(config: config.split),
     ];

@@ -260,6 +260,26 @@ void main() {
     expect(find.text('Split Modifier'), findsOneWidget);
   });
 
+  testWidgets('provides localization for rain modifier title', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Builder(
+          builder: (BuildContext context) {
+            final AppLocalizations l10n = AppLocalizations.of(context)!;
+            return Text(l10n.modifierRainTitle);
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Rain Modifier'), findsOneWidget);
+  });
+
   testWidgets(
     '90 modifier keeps input interactive and commits rotated values',
     (WidgetTester tester) async {
@@ -358,6 +378,66 @@ void main() {
     expect(find.byKey(const Key('goat-image-0')), findsNothing);
   });
 
+  testWidgets('rain modifier renders full-screen overlay and ignores input', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: PlaySudokuPage(
+          roundConfig: const SudokuRoundConfig(
+            difficulty: SudokuDifficulty.easy,
+            crazyModeEnabled: true,
+          ),
+          repository: _FakeRepository(),
+          random: _PredictableRandom(<int>[0, 4, 0, 0, 0, 500000, 500000]),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.pump(const Duration(seconds: 8));
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump();
+
+    expect(find.text('Rain Modifier'), findsOneWidget);
+    expect(find.byKey(const Key('rain-overlay')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('sudoku-grid-orientation-0')),
+        matching: find.byKey(const Key('rain-overlay')),
+      ),
+      findsNothing,
+    );
+
+    final IgnorePointer ignorePointer = tester.widget<IgnorePointer>(
+      find.byWidgetPredicate(
+        (Widget widget) =>
+            widget is IgnorePointer &&
+            widget.child is CustomPaint &&
+            (widget.child! as CustomPaint).key == const Key('rain-overlay'),
+      ),
+    );
+    expect(ignorePointer.ignoring, isTrue);
+
+    await tester.tap(find.byKey(const Key('sudoku-cell-0-1')));
+    await tester.pump();
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('sudoku-cell-0-1')),
+        matching: find.text('1'),
+      ),
+      findsOneWidget,
+    );
+
+    await tester.pump(const Duration(seconds: 6));
+    await tester.pump();
+
+    expect(find.text('Rain Modifier'), findsNothing);
+    expect(find.byKey(const Key('rain-overlay')), findsNothing);
+  });
+
   testWidgets('text rotation modifier keeps input interactive', (
     WidgetTester tester,
   ) async {
@@ -371,7 +451,7 @@ void main() {
             crazyModeEnabled: true,
           ),
           repository: _FakeRepository(),
-          random: _PredictableRandom(<int>[0, 4, 1, 0]),
+          random: _PredictableRandom(<int>[0, 5, 1, 0]),
         ),
       ),
     );
@@ -408,7 +488,7 @@ void main() {
             crazyModeEnabled: true,
           ),
           repository: _FakeRepository(),
-          random: _PredictableRandom(<int>[0, 5]),
+          random: _PredictableRandom(<int>[0, 6]),
         ),
       ),
     );

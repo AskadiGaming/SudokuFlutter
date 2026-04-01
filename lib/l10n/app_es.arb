@@ -18,6 +18,7 @@
   "modifier360Title": "Modificador 360",
   "modifier90Title": "Modificador 90°",
   "modifierGoatTitle": "Goat Modifier",
+  "modifierRainTitle": "Rain Modifier",
   "modifierTextRotationTitle": "Text Rotation Modifier",
   "modifierSplitTitle": "Split Modifier",
   "settingsLanguageTitle": "Idioma",
@@ -25,3 +26,5 @@
   "sudokuSolvedTitle": "Sudoku resuelto",
   "sudokuPlayAgain": "Jugar de nuevo"
 }
+
+

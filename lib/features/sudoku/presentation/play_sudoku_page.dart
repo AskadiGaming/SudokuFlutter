@@ -21,6 +21,8 @@ import 'modifiers/core/sudoku_modifier_factory.dart';
 import 'modifiers/core/sudoku_modifier_registry.dart';
 import 'modifiers/core/sudoku_modifier_scheduler.dart';
 import 'modifiers/models/flying_goat.dart';
+import 'modifiers/models/rain_drop.dart';
+import 'modifiers/widgets/rain_overlay.dart';
 import 'widgets/modifier_banner.dart';
 import 'widgets/number_pad.dart';
 import 'widgets/sudoku_grid.dart';
@@ -77,12 +79,17 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
   SudokuModifierType? _activeModifier;
   Offset _gridShakeOffset = Offset.zero;
   Size _goatViewportSize = Size.zero;
+  Size _rainViewportSize = Size.zero;
   DateTime? _lastGoatUpdate;
+  DateTime? _lastRainUpdate;
   final List<FlyingGoat> _flyingGoats = <FlyingGoat>[];
+  final List<RainDrop> _rainDrops = <RainDrop>[];
   int _nextGoatId = 0;
+  int _nextRainDropId = 0;
   int _quarterTurns = 0;
   final Map<int, int> _textRotationDirections = <int, int>{};
   bool _modifierLifecycleStarted = false;
+  bool _isDisposing = false;
   bool _isSolved = false;
   bool _isFinishSequenceRunning = false;
   bool _showSolvedOverlay = false;
@@ -100,7 +107,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
     _modifierContext = SudokuModifierContext(
       random: _random,
       tickerProvider: this,
-      isMounted: () => mounted,
+      isMounted: () => mounted && !_isDisposing,
       scheduleSetState: (VoidCallback callback) => setState(callback),
       deactivateModifier: () => _modifierScheduler.deactivateCurrentModifier(),
       readGridData: () => _gridData,
@@ -118,6 +125,13 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
       readLastGoatUpdate: () => _lastGoatUpdate,
       writeLastGoatUpdate: (DateTime? value) {
         _lastGoatUpdate = value;
+      },
+      readRainViewportSize: () => _rainViewportSize,
+      readRainDrops: () => _rainDrops,
+      readAndIncrementNextRainDropId: () => _nextRainDropId++,
+      readLastRainUpdate: () => _lastRainUpdate,
+      writeLastRainUpdate: (DateTime? value) {
+        _lastRainUpdate = value;
       },
       rotationController: _rotationController,
       rotation90Controller: _rotation90Controller,
@@ -155,6 +169,8 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
         _showSolvedOverlay = false;
         _isReplayStarting = false;
         _hiddenCellIndices.clear();
+        _rainDrops.clear();
+        _lastRainUpdate = null;
       });
       _startModifierLifecycleIfNeeded();
       _checkSolvedAndMaybeStartFinishSequence();
@@ -260,6 +276,10 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
     _goatViewportSize = viewportSize;
   }
 
+  void _updateRainViewport(Size viewportSize) {
+    _rainViewportSize = viewportSize;
+  }
+
   bool get _isInteractionLocked =>
       _isFinishSequenceRunning || _showSolvedOverlay || _isReplayStarting;
 
@@ -291,6 +311,8 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
       _gridShakeOffset = Offset.zero;
       _hiddenCellIndices.clear();
       _flyingGoats.clear();
+      _rainDrops.clear();
+      _lastRainUpdate = null;
     });
 
     for (final int index in _spiralOrder) {
@@ -359,6 +381,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
 
   @override
   void dispose() {
+    _isDisposing = true;
     _modifierScheduler.dispose();
     _rotationController.dispose();
     _rotation90Controller.dispose();
@@ -369,12 +392,35 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
 
   @override
   Widget build(BuildContext context) {
+    final bool showRainOverlay =
+        widget.roundConfig.crazyModeEnabled &&
+        (_activeModifier == SudokuModifierType.rain || _rainDrops.isNotEmpty);
+
     return Scaffold(
       appBar: AppBar(title: const Text('Sudoku')),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: _buildContent(context),
+        child: LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints constraints) {
+            _updateRainViewport(
+              Size(constraints.maxWidth, constraints.maxHeight),
+            );
+            return Stack(
+              fit: StackFit.expand,
+              children: <Widget>[
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: _buildContent(context),
+                ),
+                if (showRainOverlay)
+                  Positioned.fill(
+                    child: RainOverlay(
+                      drops: _rainDrops,
+                      slantDxPerLength: _modifierConfig.rain.slantDxPerLength,
+                    ),
+                  ),
+              ],
+            );
+          },
         ),
       ),
     );

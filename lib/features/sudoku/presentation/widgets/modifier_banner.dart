@@ -29,6 +29,9 @@ class ModifierBanner extends StatelessWidget {
       case SudokuModifierType.goat:
         label = l10n?.modifierGoatTitle ?? 'Goat Modifier';
         break;
+      case SudokuModifierType.rain:
+        label = l10n?.modifierRainTitle ?? 'Rain Modifier';
+        break;
       case SudokuModifierType.textRotation:
         label = l10n?.modifierTextRotationTitle ?? 'Text Rotation Modifier';
         break;
