@@ -32,6 +32,9 @@ class ModifierBanner extends StatelessWidget {
       case SudokuModifierType.textRotation:
         label = l10n?.modifierTextRotationTitle ?? 'Text Rotation Modifier';
         break;
+      case SudokuModifierType.split:
+        label = l10n?.modifierSplitTitle ?? 'Split Modifier';
+        break;
       case null:
         break;
     }

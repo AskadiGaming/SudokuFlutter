@@ -240,6 +240,26 @@ void main() {
     expect(find.text('Text Rotation Modifier'), findsOneWidget);
   });
 
+  testWidgets('provides localization for split modifier title', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Builder(
+          builder: (BuildContext context) {
+            final AppLocalizations l10n = AppLocalizations.of(context)!;
+            return Text(l10n.modifierSplitTitle);
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Split Modifier'), findsOneWidget);
+  });
+
   testWidgets(
     '90 modifier keeps input interactive and commits rotated values',
     (WidgetTester tester) async {
@@ -372,6 +392,47 @@ void main() {
         matching: find.text('1'),
       ),
       findsOneWidget,
+    );
+  });
+
+  testWidgets('split modifier translates cells and keeps center stable', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: PlaySudokuPage(
+          roundConfig: const SudokuRoundConfig(
+            difficulty: SudokuDifficulty.easy,
+            crazyModeEnabled: true,
+          ),
+          repository: _FakeRepository(),
+          random: _PredictableRandom(<int>[0, 5]),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.pump(const Duration(seconds: 8));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump();
+
+    expect(find.text('Split Modifier'), findsOneWidget);
+    expect(
+      _hasNonZeroAncestorTranslation(
+        tester,
+        find.byKey(const Key('sudoku-cell-0-0')),
+      ),
+      isTrue,
+    );
+    expect(
+      _hasNonZeroAncestorTranslation(
+        tester,
+        find.byKey(const Key('sudoku-cell-4-4')),
+      ),
+      isFalse,
     );
   });
 
@@ -559,4 +620,21 @@ class _TrackingRepository implements SudokuPuzzleRepository {
     randomCalls += 1;
     return randomPuzzle;
   }
+}
+
+bool _hasNonZeroAncestorTranslation(WidgetTester tester, Finder cellFinder) {
+  final Finder transformsFinder = find.ancestor(
+    of: cellFinder,
+    matching: find.byType(Transform),
+  );
+  for (final Element element in transformsFinder.evaluate()) {
+    final Transform transform = element.widget as Transform;
+    final List<double> storage = transform.transform.storage;
+    final bool hasTranslation =
+        storage[12].abs() > 0.001 || storage[13].abs() > 0.001;
+    if (hasTranslation) {
+      return true;
+    }
+  }
+  return false;
 }

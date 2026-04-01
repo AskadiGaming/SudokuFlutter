@@ -64,6 +64,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
   late final AnimationController _rotationController;
   late final AnimationController _rotation90Controller;
   late final AnimationController _textRotationController;
+  late final AnimationController _splitController;
   late final SudokuModifierGlobalConfig _modifierConfig =
       defaultSudokuModifierGlobalConfig;
   late final SudokuModifierContext _modifierContext;
@@ -94,6 +95,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
     _rotationController = AnimationController(vsync: this);
     _rotation90Controller = AnimationController(vsync: this);
     _textRotationController = AnimationController(vsync: this);
+    _splitController = AnimationController(vsync: this);
 
     _modifierContext = SudokuModifierContext(
       random: _random,
@@ -120,6 +122,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
       rotationController: _rotationController,
       rotation90Controller: _rotation90Controller,
       textRotationController: _textRotationController,
+      splitController: _splitController,
       textRotationDirections: _textRotationDirections,
     );
 
@@ -360,6 +363,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
     _rotationController.dispose();
     _rotation90Controller.dispose();
     _textRotationController.dispose();
+    _splitController.dispose();
     super.dispose();
   }
 
@@ -404,6 +408,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
                 aspectRatio: 1,
                 child: Stack(
                   fit: StackFit.expand,
+                  clipBehavior: Clip.none,
                   children: <Widget>[
                     SudokuGrid(
                       gridData: gridData,
@@ -414,6 +419,8 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
                       rotationController: _rotationController,
                       rotation90Controller: _rotation90Controller,
                       textRotationController: _textRotationController,
+                      splitController: _splitController,
+                      splitMaxOffsetPx: _modifierConfig.split.maxOffsetPx,
                       textRotationDirections: _textRotationDirections,
                       flyingGoats: _flyingGoats,
                       goatAssetPath: _goatAssetPath,

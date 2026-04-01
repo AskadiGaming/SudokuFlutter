@@ -3,6 +3,7 @@ import '../goat_modifier.dart';
 import '../rotation_360_modifier.dart';
 import '../rotation_90_modifier.dart';
 import '../shaking_modifier.dart';
+import '../split_modifier.dart';
 import '../text_rotation_modifier.dart';
 import 'sudoku_modifier.dart';
 import 'sudoku_modifier_registry.dart';
@@ -19,6 +20,7 @@ class SudokuModifierFactory {
       Rotation90Modifier(config: config.rotation90),
       GoatModifier(config: config.goat),
       TextRotationModifier(config: config.textRotation),
+      SplitModifier(config: config.split),
     ];
 
     return SudokuModifierRegistry(modifiers: modifiers);

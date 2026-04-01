@@ -36,4 +36,9 @@ final SudokuModifierGlobalConfig defaultSudokuModifierGlobalConfig =
         runtime: ModifierRuntimeConfig(enabled: true, weight: 1),
         duration: 6,
       ),
+      split: SplitModifierConfig(
+        runtime: ModifierRuntimeConfig(enabled: true, weight: 100),
+        duration: 4,
+        maxOffsetPx: 48,
+      ),
     );

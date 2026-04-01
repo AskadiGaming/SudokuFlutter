@@ -10,6 +10,7 @@ class SudokuModifierGlobalConfig {
     required this.rotation90,
     required this.goat,
     required this.textRotation,
+    required this.split,
   });
 
   final SudokuSchedulerConfig scheduler;
@@ -18,6 +19,7 @@ class SudokuModifierGlobalConfig {
   final Rotation90ModifierConfig rotation90;
   final GoatModifierConfig goat;
   final TextRotationModifierConfig textRotation;
+  final SplitModifierConfig split;
 
   ModifierRuntimeConfig runtimeFor(SudokuModifierType type) {
     switch (type) {
@@ -31,6 +33,8 @@ class SudokuModifierGlobalConfig {
         return goat.runtime;
       case SudokuModifierType.textRotation:
         return textRotation.runtime;
+      case SudokuModifierType.split:
+        return split.runtime;
     }
   }
 }
@@ -231,4 +235,23 @@ class GoatModifierConfig {
   @visibleForTesting
   bool get hasValidDurationRange =>
       duration.minSeconds <= duration.maxSeconds && duration.minSeconds > 0;
+}
+
+class SplitModifierConfig {
+  SplitModifierConfig({
+    required this.runtime,
+    required this.duration,
+    required this.maxOffsetPx,
+  }) {
+    if (duration <= 0) {
+      throw ArgumentError('Split duration must be > 0 seconds, got $duration.');
+    }
+    if (maxOffsetPx < 0) {
+      throw ArgumentError('Split maxOffsetPx must be >= 0, got $maxOffsetPx.');
+    }
+  }
+
+  final ModifierRuntimeConfig runtime;
+  final int duration;
+  final double maxOffsetPx;
 }

@@ -1,0 +1,174 @@
+# Implementierungsplan: Split Modifier (81 Felder splitten und wieder zusammenschieben)
+
+## Ziel
+Ein neuer Crazy-Mode-Modifier mit dem Namen **"Split Modifier"** soll alle 81 Sudoku-Felder visuell aufsplitten und danach wieder zusammenschieben.
+
+Pflichtanforderungen:
+- Die Animation betrifft alle 81 Felder.
+- Phase 1: Felder bewegen sich auseinander (Split).
+- Phase 2: Felder bewegen sich wieder zur Normalposition (Merge).
+- Nach Abschluss ist das Grid wieder exakt in Ausgangsform.
+- Der Modifier ist in den bestehenden Modifier-Lifecycle integriert und kann mehrfach auftreten.
+
+## Ausgangslage im Code
+- Modifier-System existiert bereits mit Factory, Registry und Scheduler.
+- Aktuelle Modifier: `shaking`, `rotation360`, `rotation90`, `goat`, `textRotation`.
+- Grid-Rendering liegt in `lib/features/sudoku/presentation/widgets/sudoku_grid.dart`.
+- Pro Zelle existiert bereits ein zentraler Renderpfad ueber `GridView.builder(itemCount: 81)`.
+
+## Architekturentscheidung (MVP)
+Der Split-Modifier wird als eigener Modifier-Typ umgesetzt und steuert eine dedizierte Animation:
+
+1. Eigener Typ `split` im Enum.
+2. Eigene Config fuer Dauer und Split-Intensitaet.
+3. Eigener `AnimationController` fuer den Modifier.
+4. Die Zell-Positionen werden im Grid pro Index dynamisch transformiert.
+5. Modifier steuert Start und Ende selbst (`controlsOwnDeactivation = true`), damit "auseinander" und "zusammen" garantiert in einem Durchlauf abgeschlossen werden.
+
+## Animationsmodell (vorgeschlagen)
+### Bewegungsrichtung
+- Jede Zelle bewegt sich radial vom Grid-Zentrum weg.
+- Richtungsvektor pro Zelle:
+  - `dx = col - 4`
+  - `dy = row - 4`
+  - normierter Vektor aus `(dx, dy)`
+
+### Bewegungsstaerke
+- Basisdistanz konfigurierbar, z. B. `maxOffsetPx`.
+- Optional leichter Index- oder Distanz-Scale, damit innere und aeussere Felder unterschiedlich stark reagieren.
+
+### Zeitlicher Verlauf
+- Ein Controller von `0 -> 1` mit Zweiphasen-Kurve:
+  - `0.0 .. 0.5`: Split
+  - `0.5 .. 1.0`: Merge
+- Beispiel:
+  - `splitProgress = sin(pi * t)`
+  - dadurch automatisch: 0 -> 1 -> 0
+
+## Umsetzungsstrategie (10 Schritte)
+
+### 1. Modifier-Typ erweitern
+- Datei: `lib/features/sudoku/domain/sudoku_modifier_type.dart`
+- Neues Enum-Element: `split`
+
+Ergebnis: Der neue Modifier ist Teil des Typsystems.
+
+### 2. Konfiguration erweitern
+- Datei: `lib/features/sudoku/domain/sudoku_modifier_config.dart`
+- Neue Config-Klasse `SplitModifierConfig`, z. B.:
+  - `ModifierRuntimeConfig runtime`
+  - `int durationSeconds`
+  - `double maxOffsetPx`
+- `SudokuModifierGlobalConfig` um `split` erweitern.
+- `runtimeFor(...)` um `split` erweitern.
+
+Ergebnis: Split hat konfigurierbare Laufzeit und Gewichtung.
+
+### 3. Default-Config setzen
+- Datei: `lib/features/sudoku/domain/default_sudoku_modifier_config.dart`
+- Split mit Startwerten aufnehmen, z. B.:
+  - `enabled: true`
+  - `weight: 1`
+  - `durationSeconds: 3..5` (oder fixer Wert)
+  - `maxOffsetPx: 18..32`
+
+Ergebnis: Modifier ist direkt lauffaehig und vom Scheduler auswählbar.
+
+### 4. Modifier-Klasse anlegen
+- Neue Datei: `lib/features/sudoku/presentation/modifiers/split_modifier.dart`
+- Implementiert `SudokuModifier`.
+- Startet auf `onStart` die Split-Animation.
+- Nutzt `controlsOwnDeactivation = true`.
+- Deaktiviert sich erst nach kompletter Hin-und-Zurueck-Animation.
+
+Ergebnis: Lifecycle ist robust und abgeschlossen, bevor naechster Modifier startet.
+
+### 5. Factory/Registry verdrahten
+- Datei: `lib/features/sudoku/presentation/modifiers/core/sudoku_modifier_factory.dart`
+- `SplitModifier` zur Modifier-Liste hinzufuegen.
+
+Ergebnis: Scheduler kann den Split-Modifier zufaellig auswaehlen.
+
+### 6. Modifier-Context erweitern
+- Datei: `lib/features/sudoku/presentation/modifiers/core/sudoku_modifier_context.dart`
+- Neuen Controller im Context bereitstellen, z. B. `splitController`.
+- `PlaySudokuPage` erzeugt und uebergibt den Controller analog zu bestehenden Rotations-Controllern.
+
+Ergebnis: Modifier und Grid greifen auf denselben Animationszustand zu.
+
+### 7. Grid-Rendering fuer Split erweitern
+- Datei: `lib/features/sudoku/presentation/widgets/sudoku_grid.dart`
+- Neuer Status `isSplit = activeModifier == SudokuModifierType.split`.
+- Pro Zelle `Transform.translate` mit indexbasiertem Offset anwenden.
+- Offset-Berechnung aus `splitProgress` und radialem Richtungsvektor.
+- Wichtig:
+  - Hit-Tests waehrend Transform konsistent halten.
+  - Clipping pruefen (`clipBehavior`) damit Bewegung nicht abgeschnitten wirkt.
+
+Ergebnis: Alle 81 Zellen splitten sichtbar und kommen zusammen.
+
+### 8. UI-Label/Lokalisierung ergaenzen
+- Dateien: `lib/l10n/app_de.arb`, `app_en.arb`, `app_es.arb`, `app_fr.arb`, `app_it.arb`
+- Neuer Key, z. B. `modifierSplitTitle`.
+- Banner-Mapping in `PlaySudokuPage`/`ModifierBanner` ergaenzen.
+
+Ergebnis: Aktiver Split-Modifier ist klar benannt.
+
+### 9. Zusammenspiel mit Finish-Flow absichern
+- In `PlaySudokuPage` sicherstellen:
+  - Keine neuen Modifier starten, wenn Finish-Sequenz laeuft.
+  - Aktive Split-Animation sauber stoppen, wenn Runde endet oder Seite disposed.
+- Konflikte mit `hiddenCellIndices` und End-Overlay verhindern.
+
+Ergebnis: Keine visuellen Race-Conditions zwischen Finish und Split.
+
+### 10. Tests und Abnahme
+- Unit-Tests:
+  - Split-Progress-Kurve liefert 0 am Anfang und Ende.
+  - Richtung/Offset-Berechnung fuer repräsentative Indizes (z. B. 0, 4, 40, 80).
+- Widget-Tests:
+  - Split-Modifier aktiviert Translation fuer alle Zellen.
+  - Nach Ende ist Grid wieder in Normalposition.
+  - Keine dauerhafte Veraenderung von `currentGrid`/`solutionGrid`.
+- Manueller Test:
+  - Mehrfaches Auftreten im Crazy Mode.
+  - Keine Touch-Regression waehrend und nach der Animation.
+
+Ergebnis: Modifier ist stabil, wiederholbar und regressionsarm.
+
+## Geplante Dateien
+- `docs/splite_modifier.md`
+- `lib/features/sudoku/domain/sudoku_modifier_type.dart`
+- `lib/features/sudoku/domain/sudoku_modifier_config.dart`
+- `lib/features/sudoku/domain/default_sudoku_modifier_config.dart`
+- `lib/features/sudoku/presentation/play_sudoku_page.dart`
+- `lib/features/sudoku/presentation/modifiers/core/sudoku_modifier_context.dart`
+- `lib/features/sudoku/presentation/modifiers/core/sudoku_modifier_factory.dart`
+- `lib/features/sudoku/presentation/modifiers/split_modifier.dart` (neu)
+- `lib/features/sudoku/presentation/widgets/sudoku_grid.dart`
+- `lib/l10n/app_de.arb`
+- `lib/l10n/app_en.arb`
+- `lib/l10n/app_es.arb`
+- `lib/l10n/app_fr.arb`
+- `lib/l10n/app_it.arb`
+- `test/...` fuer Unit- und Widget-Tests
+
+## Akzeptanzkriterien
+1. Es gibt einen neuen Modifier `Split Modifier` im Crazy Mode.
+2. Bei Aktivierung bewegen sich alle 81 Felder sichtbar auseinander.
+3. Anschliessend bewegen sich alle 81 Felder wieder zusammen.
+4. Nach Ende steht das Grid exakt im Ursprungslayout.
+5. Der Modifier kann mehrfach auftreten, ohne Zustand zu zerstoeren.
+6. Keine Konflikte mit bestehendem Finish-Flow und anderen Modifiern.
+
+## Risiken und offene Punkte
+- Clipping: Bei grossem Offset koennen Zellen abgeschnitten wirken, wenn Parent-Widgets clippen.
+- Touch-Zuordnung: Bei starker Translation kann die gefuehlte Tap-Position vom Nutzer als ungewohnt empfunden werden.
+- Performance: 81 gleichzeitige Transforms sind machbar, sollten aber auf schwachen Geraeten profiliert werden.
+- Modifier-Interaktion: Split darf keine persistenten Datenrotationen oder Grid-Mutationen verursachen.
+
+## Empfohlene Startwerte (MVP)
+- `durationSeconds`: 4
+- `maxOffsetPx`: 24
+- Kurve: `easeOut` fuer Split und `easeIn` fuer Merge (oder `sin(pi*t)` fuer 0->1->0)
+- Weight initial: `1` (spaeter ueber Telemetrie feinjustieren)

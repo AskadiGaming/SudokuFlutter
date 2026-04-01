@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../domain/sudoku_grid_parser.dart';
 import '../../domain/sudoku_modifier_type.dart';
 import '../modifiers/models/flying_goat.dart';
+import 'sudoku_split_math.dart';
 
 class SudokuGrid extends StatelessWidget {
   const SudokuGrid({
@@ -16,6 +17,8 @@ class SudokuGrid extends StatelessWidget {
     required this.rotationController,
     required this.rotation90Controller,
     required this.textRotationController,
+    required this.splitController,
+    required this.splitMaxOffsetPx,
     required this.textRotationDirections,
     required this.flyingGoats,
     required this.goatAssetPath,
@@ -34,6 +37,8 @@ class SudokuGrid extends StatelessWidget {
   final AnimationController rotationController;
   final AnimationController rotation90Controller;
   final AnimationController textRotationController;
+  final AnimationController splitController;
+  final double splitMaxOffsetPx;
   final Map<int, int> textRotationDirections;
   final List<FlyingGoat> flyingGoats;
   final String goatAssetPath;
@@ -50,14 +55,18 @@ class SudokuGrid extends StatelessWidget {
     final bool isRotating90 = activeModifier == SudokuModifierType.rotation90;
     final bool isTextRotating =
         activeModifier == SudokuModifierType.textRotation;
+    final bool isSplit = activeModifier == SudokuModifierType.split;
     final bool showGoatOverlay =
         activeModifier == SudokuModifierType.goat || flyingGoats.isNotEmpty;
 
     Widget buildGridContent() {
       final double rotation90Angle = rotation90Controller.value * (pi / 2);
+      final double splitProgress =
+          isSplit ? splitProgressForControllerValue(splitController.value) : 0;
       final Widget grid = GridView.builder(
         key: Key('sudoku-grid-orientation-$quarterTurns'),
         physics: const NeverScrollableScrollPhysics(),
+        clipBehavior: Clip.none,
         itemCount: 81,
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 9,
@@ -78,7 +87,7 @@ class SudokuGrid extends StatelessWidget {
           final Color backgroundColor =
               isHighlighted ? theme.colorScheme.secondaryContainer : baseColor;
 
-          return AnimatedOpacity(
+          final Widget cell = AnimatedOpacity(
             opacity: isHidden ? 0 : 1,
             duration: const Duration(milliseconds: 120),
             child: IgnorePointer(
@@ -122,6 +131,19 @@ class SudokuGrid extends StatelessWidget {
               ),
             ),
           );
+
+          if (!isSplit || splitProgress <= 0) {
+            return cell;
+          }
+          return Transform.translate(
+            offset: splitOffsetForIndex(
+              index: index,
+              splitProgress: splitProgress,
+              maxOffsetPx: splitMaxOffsetPx,
+            ),
+            transformHitTests: true,
+            child: cell,
+          );
         },
       );
 
@@ -132,7 +154,7 @@ class SudokuGrid extends StatelessWidget {
     }
 
     Widget gridLayer() {
-      if (!isRotating360 && !isRotating90 && !isTextRotating) {
+      if (!isRotating360 && !isRotating90 && !isTextRotating && !isSplit) {
         return buildGridContent();
       }
 
@@ -141,6 +163,7 @@ class SudokuGrid extends StatelessWidget {
           rotationController,
           rotation90Controller,
           textRotationController,
+          splitController,
         ]),
         builder: (BuildContext context, Widget? child) {
           final double angle =
@@ -162,6 +185,7 @@ class SudokuGrid extends StatelessWidget {
         onViewportChanged(Size(constraints.maxWidth, constraints.maxHeight));
         return Stack(
           fit: StackFit.expand,
+          clipBehavior: Clip.none,
           children: <Widget>[
             gridLayer(),
             if (showGoatOverlay)

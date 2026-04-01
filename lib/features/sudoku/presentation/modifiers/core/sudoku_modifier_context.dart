@@ -26,6 +26,7 @@ class SudokuModifierContext {
     required this.rotationController,
     required this.rotation90Controller,
     required this.textRotationController,
+    required this.splitController,
     required this.textRotationDirections,
   }) : _tickerProvider = tickerProvider,
        _isMounted = isMounted,
@@ -61,6 +62,7 @@ class SudokuModifierContext {
   final AnimationController rotationController;
   final AnimationController rotation90Controller;
   final AnimationController textRotationController;
+  final AnimationController splitController;
   final Map<int, int> textRotationDirections;
 
   bool get mounted => _isMounted();

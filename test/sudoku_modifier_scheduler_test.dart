@@ -87,6 +87,7 @@ class _SchedulerHarness {
     _rotationController = AnimationController(vsync: vsync);
     _rotation90Controller = AnimationController(vsync: vsync);
     _textRotationController = AnimationController(vsync: vsync);
+    _splitController = AnimationController(vsync: vsync);
 
     _context = SudokuModifierContext(
       random: Random(42),
@@ -107,6 +108,7 @@ class _SchedulerHarness {
       rotationController: _rotationController,
       rotation90Controller: _rotation90Controller,
       textRotationController: _textRotationController,
+      splitController: _splitController,
       textRotationDirections: <int, int>{},
     );
 
@@ -124,6 +126,7 @@ class _SchedulerHarness {
   late final AnimationController _rotationController;
   late final AnimationController _rotation90Controller;
   late final AnimationController _textRotationController;
+  late final AnimationController _splitController;
   late final SudokuModifierScheduler scheduler;
 
   SudokuModifierType? activeModifier;
@@ -133,6 +136,7 @@ class _SchedulerHarness {
     _rotationController.dispose();
     _rotation90Controller.dispose();
     _textRotationController.dispose();
+    _splitController.dispose();
   }
 }
 
@@ -173,6 +177,11 @@ SudokuModifierGlobalConfig _buildConfig({
     textRotation: TextRotationModifierConfig(
       runtime: ModifierRuntimeConfig(enabled: false, weight: 0),
       duration: 6,
+    ),
+    split: SplitModifierConfig(
+      runtime: ModifierRuntimeConfig(enabled: false, weight: 0),
+      duration: 4,
+      maxOffsetPx: 24,
     ),
   );
 }
