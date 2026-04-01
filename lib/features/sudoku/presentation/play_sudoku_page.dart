@@ -9,6 +9,7 @@ import '../domain/sudoku_grid_parser.dart';
 import '../domain/sudoku_modifier_config.dart';
 import '../domain/sudoku_modifier_type.dart';
 import '../domain/sudoku_round_config.dart';
+import '../domain/sudoku_round_mode.dart';
 import 'modifiers/core/sudoku_modifier_context.dart';
 import 'modifiers/core/sudoku_modifier_factory.dart';
 import 'modifiers/core/sudoku_modifier_registry.dart';
@@ -116,9 +117,12 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
 
   Future<void> _loadPuzzle() async {
     try {
-      final String puzzle = await _repository.loadPuzzle(
-        widget.roundConfig.difficulty,
-      );
+      final String puzzle =
+          widget.roundConfig.mode == SudokuRoundMode.daily
+              ? await _repository.getOrCreateDailyPuzzle(DateTime.now())
+              : await _repository.getRandomByDifficulty(
+                widget.roundConfig.difficulty,
+              );
       final SudokuGridData parsed = parsePuzzle(puzzle);
       if (!mounted) {
         return;

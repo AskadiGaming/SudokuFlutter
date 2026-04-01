@@ -1,0 +1,1 @@
+enum SudokuRoundMode { normal, daily }

@@ -377,17 +377,25 @@ void main() {
 
 class _FakeRepository implements SudokuPuzzleRepository {
   @override
-  Future<String> loadPuzzle(SudokuDifficulty difficulty) async {
-    return '500000307'
-        '000000000'
-        '000000000'
-        '000000000'
-        '000000000'
-        '000000000'
-        '000000000'
-        '000000000'
-        '000000000';
+  Future<String> getRandomByDifficulty(SudokuDifficulty difficulty) async {
+    return _puzzle;
   }
+
+  @override
+  Future<String> getOrCreateDailyPuzzle(DateTime date) async {
+    return _puzzle;
+  }
+
+  static const String _puzzle =
+      '500000307'
+      '000000000'
+      '000000000'
+      '000000000'
+      '000000000'
+      '000000000'
+      '000000000'
+      '000000000'
+      '000000000';
 }
 
 class _PredictableRandom implements Random {
