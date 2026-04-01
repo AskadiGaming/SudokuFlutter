@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hello_world_app/features/sudoku/data/sudoku_puzzle_repository.dart';
+import 'package:hello_world_app/features/sudoku/domain/admin_test_sudoku_config.dart';
 import 'package:hello_world_app/features/sudoku/domain/sudoku_difficulty.dart';
 import 'package:hello_world_app/features/sudoku/domain/sudoku_round_config.dart';
 import 'package:hello_world_app/features/sudoku/presentation/play_sudoku_page.dart';
@@ -373,6 +374,128 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('active and valid admin override is used before repository', (
+    WidgetTester tester,
+  ) async {
+    final _TrackingRepository repository = _TrackingRepository(
+      randomPuzzle: _FakeRepository._puzzle,
+      dailyPuzzle: _FakeRepository._puzzle,
+    );
+    const AdminTestSudokuConfig config = AdminTestSudokuConfig(
+      enabled: true,
+      sudokuString:
+          '100000000'
+          '000000000'
+          '000000000'
+          '000000000'
+          '000000000'
+          '000000000'
+          '000000000'
+          '000000000'
+          '000000000',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PlaySudokuPage(
+          roundConfig: const SudokuRoundConfig(
+            difficulty: SudokuDifficulty.easy,
+          ),
+          repository: repository,
+          adminTestOverrideConfig: config,
+          adminTestOverrideEnabled: true,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.randomCalls, 0);
+    expect(repository.dailyCalls, 0);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('sudoku-cell-0-0')),
+        matching: find.text('1'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('invalid active admin override falls back to repository', (
+    WidgetTester tester,
+  ) async {
+    final _TrackingRepository repository = _TrackingRepository(
+      randomPuzzle: _FakeRepository._puzzle,
+      dailyPuzzle: _FakeRepository._puzzle,
+    );
+    const AdminTestSudokuConfig config = AdminTestSudokuConfig(
+      enabled: true,
+      sudokuString: '123',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PlaySudokuPage(
+          roundConfig: const SudokuRoundConfig(
+            difficulty: SudokuDifficulty.easy,
+          ),
+          repository: repository,
+          adminTestOverrideConfig: config,
+          adminTestOverrideEnabled: true,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.randomCalls, 1);
+    expect(repository.dailyCalls, 0);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('sudoku-cell-0-0')),
+        matching: find.text('5'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('inactive admin override keeps normal repository behavior', (
+    WidgetTester tester,
+  ) async {
+    final _TrackingRepository repository = _TrackingRepository(
+      randomPuzzle: _FakeRepository._puzzle,
+      dailyPuzzle: _FakeRepository._puzzle,
+    );
+    const AdminTestSudokuConfig config = AdminTestSudokuConfig(
+      enabled: false,
+      sudokuString:
+          '100000000'
+          '000000000'
+          '000000000'
+          '000000000'
+          '000000000'
+          '000000000'
+          '000000000'
+          '000000000'
+          '000000000',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PlaySudokuPage(
+          roundConfig: const SudokuRoundConfig(
+            difficulty: SudokuDifficulty.easy,
+          ),
+          repository: repository,
+          adminTestOverrideConfig: config,
+          adminTestOverrideEnabled: true,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.randomCalls, 1);
+    expect(repository.dailyCalls, 0);
+  });
 }
 
 class _FakeRepository implements SudokuPuzzleRepository {
@@ -414,5 +537,26 @@ class _PredictableRandom implements Random {
   int nextInt(int max) {
     final int raw = _index < values.length ? values[_index++] : 0;
     return raw % max;
+  }
+}
+
+class _TrackingRepository implements SudokuPuzzleRepository {
+  _TrackingRepository({required this.randomPuzzle, required this.dailyPuzzle});
+
+  final String randomPuzzle;
+  final String dailyPuzzle;
+  int randomCalls = 0;
+  int dailyCalls = 0;
+
+  @override
+  Future<String> getOrCreateDailyPuzzle(DateTime date) async {
+    dailyCalls += 1;
+    return dailyPuzzle;
+  }
+
+  @override
+  Future<String> getRandomByDifficulty(SudokuDifficulty difficulty) async {
+    randomCalls += 1;
+    return randomPuzzle;
   }
 }

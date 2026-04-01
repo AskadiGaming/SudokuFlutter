@@ -1,9 +1,12 @@
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../data/local_sudoku_puzzle_repository.dart';
 import '../data/sudoku_puzzle_repository.dart';
+import '../dev/admin_test_sudoku_override.dart';
+import '../domain/admin_test_sudoku_config.dart';
 import '../domain/default_sudoku_modifier_config.dart';
 import '../domain/sudoku_grid_parser.dart';
 import '../domain/sudoku_modifier_config.dart';
@@ -23,12 +26,16 @@ class PlaySudokuPage extends StatefulWidget {
   const PlaySudokuPage({
     required this.roundConfig,
     this.repository,
+    this.adminTestOverrideConfig,
+    this.adminTestOverrideEnabled,
     this.random,
     super.key,
   });
 
   final SudokuRoundConfig roundConfig;
   final SudokuPuzzleRepository? repository;
+  final AdminTestSudokuConfig? adminTestOverrideConfig;
+  final bool? adminTestOverrideEnabled;
   final Random? random;
 
   @override
@@ -117,12 +124,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
 
   Future<void> _loadPuzzle() async {
     try {
-      final String puzzle =
-          widget.roundConfig.mode == SudokuRoundMode.daily
-              ? await _repository.getOrCreateDailyPuzzle(DateTime.now())
-              : await _repository.getRandomByDifficulty(
-                widget.roundConfig.difficulty,
-              );
+      final String puzzle = await _resolvePuzzleString();
       final SudokuGridData parsed = parsePuzzle(puzzle);
       if (!mounted) {
         return;
@@ -139,6 +141,55 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
         _loadingError = error;
       });
     }
+  }
+
+  Future<String> _resolvePuzzleString() async {
+    final AdminTestSudokuConfig? adminOverrideConfig =
+        _readAdminOverrideConfig();
+    final String? overridePuzzle = adminOverrideConfig?.normalizedSudokuString;
+    if (overridePuzzle != null) {
+      debugPrint('Admin test sudoku override applied.');
+      return overridePuzzle;
+    }
+
+    if (widget.roundConfig.mode == SudokuRoundMode.daily) {
+      return _repository.getOrCreateDailyPuzzle(DateTime.now());
+    }
+    return _repository.getRandomByDifficulty(widget.roundConfig.difficulty);
+  }
+
+  AdminTestSudokuConfig? _readAdminOverrideConfig() {
+    if (!_isAdminOverrideRuntimeEnabled) {
+      return null;
+    }
+
+    final AdminTestSudokuConfig config =
+        widget.adminTestOverrideConfig ?? adminTestSudokuOverrideConfig;
+    if (config.hasValidOverride) {
+      return config;
+    }
+    if (config.enabled && !config.hasValidOverride) {
+      debugPrint(
+        'Admin test sudoku override ignored because configured value is invalid.',
+      );
+    }
+    return null;
+  }
+
+  bool get _isAdminOverrideRuntimeEnabled {
+    final bool? overrideEnabled = widget.adminTestOverrideEnabled;
+    if (overrideEnabled != null) {
+      return overrideEnabled;
+    }
+    return kDebugMode && !_isRunningUnderTest;
+  }
+
+  bool get _isRunningUnderTest {
+    final WidgetsBinding? binding = WidgetsBinding.instance;
+    if (binding == null) {
+      return false;
+    }
+    return binding.runtimeType.toString().contains('Test');
   }
 
   void _startModifierLifecycleIfNeeded() {
