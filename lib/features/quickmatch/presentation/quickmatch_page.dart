@@ -5,6 +5,7 @@ import '../../ads/application/show_ad_before_round_use_case.dart';
 import '../../ads/domain/ad_policy.dart';
 import '../../ads/domain/ad_timing_mode.dart';
 import '../../ads/infrastructure/debug_analytics_service.dart';
+import '../../ads/infrastructure/shared_prefs_ad_round_counter_store.dart';
 import '../../ads/infrastructure/unity_ads_config.dart';
 import '../../ads/infrastructure/unity_ads_service.dart';
 import '../../sudoku/domain/sudoku_difficulty.dart';
@@ -31,9 +32,10 @@ class _QuickmatchPageState extends State<QuickmatchPage> {
     _showAdBeforeRoundUseCase = ShowAdBeforeRoundUseCase(
       adService: UnityAdsService(config: UnityAdsConfig.fromEnvironment()),
       analyticsService: DebugAnalyticsService(),
+      roundCounterStore: SharedPrefsAdRoundCounterStore(),
       policy: const AdPolicy(
         timingMode: AdTimingMode.beforeRoundStart,
-        minRoundsBetweenAds: 1,
+        minRoundsBetweenAds: 10,
       ),
     );
   }

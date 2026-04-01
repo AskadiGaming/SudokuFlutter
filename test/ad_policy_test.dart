@@ -18,12 +18,12 @@ void main() {
   test('returns false when minimum rounds are not reached', () {
     const AdPolicy policy = AdPolicy(
       timingMode: AdTimingMode.beforeRoundStart,
-      minRoundsBetweenAds: 3,
+      minRoundsBetweenAds: 10,
     );
 
     final bool shouldShow = policy.shouldShowAd(
       now: DateTime(2026, 1, 1, 12),
-      roundsSinceLastAd: 2,
+      roundsSinceLastAd: 9,
       lastAdShownAt: DateTime(2026, 1, 1, 11),
     );
 
@@ -48,13 +48,13 @@ void main() {
   test('returns true when all constraints are met', () {
     const AdPolicy policy = AdPolicy(
       timingMode: AdTimingMode.beforeRoundStart,
-      minRoundsBetweenAds: 2,
+      minRoundsBetweenAds: 10,
       cooldown: Duration(minutes: 10),
     );
 
     final bool shouldShow = policy.shouldShowAd(
       now: DateTime(2026, 1, 1, 12, 15),
-      roundsSinceLastAd: 2,
+      roundsSinceLastAd: 10,
       lastAdShownAt: DateTime(2026, 1, 1, 12),
     );
 
