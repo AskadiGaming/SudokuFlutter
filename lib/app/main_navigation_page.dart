@@ -4,21 +4,16 @@ import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import '../features/duell/presentation/duell_page.dart';
 import '../features/quickmatch/presentation/quickmatch_page.dart';
 import '../features/settings/presentation/settings_page.dart';
-import 'theme/app_theme.dart';
 
 class MainNavigationPage extends StatefulWidget {
   const MainNavigationPage({
     required this.currentLocale,
     required this.onLocaleChanged,
-    required this.currentTheme,
-    required this.onThemeChanged,
     super.key,
   });
 
   final Locale currentLocale;
   final ValueChanged<Locale> onLocaleChanged;
-  final AppThemeKey currentTheme;
-  final ValueChanged<AppThemeKey> onThemeChanged;
 
   @override
   State<MainNavigationPage> createState() => _MainNavigationPageState();
@@ -41,8 +36,6 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
       SettingsPage(
         currentLocale: widget.currentLocale,
         onLocaleChanged: widget.onLocaleChanged,
-        currentTheme: widget.currentTheme,
-        onThemeChanged: widget.onThemeChanged,
       ),
     ];
 

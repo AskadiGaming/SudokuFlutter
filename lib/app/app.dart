@@ -15,7 +15,6 @@ class SudokuApp extends StatefulWidget {
 class _SudokuAppState extends State<SudokuApp> {
   static const Locale _defaultLocale = Locale('de');
   static const String _languagePreferenceKey = 'app_language';
-  static const String _themePreferenceKey = 'app_theme';
   static const List<Locale> _supportedLocales = <Locale>[
     Locale('de'),
     Locale('en'),
@@ -25,7 +24,6 @@ class _SudokuAppState extends State<SudokuApp> {
   ];
 
   Locale _locale = _defaultLocale;
-  AppThemeKey _currentTheme = AppThemeKey.white;
 
   @override
   void initState() {
@@ -38,31 +36,21 @@ class _SudokuAppState extends State<SudokuApp> {
     final String? savedLanguageCode = preferences.getString(
       _languagePreferenceKey,
     );
-    final String? savedThemeKey = preferences.getString(_themePreferenceKey);
 
     Locale? loadedLocale;
-    AppThemeKey? loadedTheme;
 
     if (savedLanguageCode != null) {
       loadedLocale = _localeFromLanguageCode(savedLanguageCode);
-    }
-
-    if (savedThemeKey != null) {
-      loadedTheme = appThemeFromStorageKey(savedThemeKey);
     }
 
     if (!mounted) {
       return;
     }
 
-    if (loadedLocale != null || loadedTheme != null) {
+    if (loadedLocale != null) {
+      final Locale localeToApply = loadedLocale;
       setState(() {
-        if (loadedLocale != null) {
-          _locale = loadedLocale;
-        }
-        if (loadedTheme != null) {
-          _currentTheme = loadedTheme;
-        }
+        _locale = localeToApply;
       });
     }
   }
@@ -84,14 +72,6 @@ class _SudokuAppState extends State<SudokuApp> {
     await preferences.setString(_languagePreferenceKey, locale.languageCode);
   }
 
-  Future<void> _updateTheme(AppThemeKey themeKey) async {
-    setState(() {
-      _currentTheme = themeKey;
-    });
-    final SharedPreferences preferences = await SharedPreferences.getInstance();
-    await preferences.setString(_themePreferenceKey, themeKey.storageKey);
-  }
-
   Locale _resolveLocale(Locale? deviceLocale) {
     if (deviceLocale == null) {
       return _defaultLocale;
@@ -108,7 +88,7 @@ class _SudokuAppState extends State<SudokuApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Sudoku',
-      theme: appThemes[_currentTheme],
+      theme: darkBlueTheme,
       locale: _locale,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: _supportedLocales,
@@ -117,8 +97,6 @@ class _SudokuAppState extends State<SudokuApp> {
       home: MainNavigationPage(
         currentLocale: _locale,
         onLocaleChanged: _updateLocale,
-        currentTheme: _currentTheme,
-        onThemeChanged: _updateTheme,
       ),
     );
   }
