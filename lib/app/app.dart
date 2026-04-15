@@ -2,6 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../features/profile/application/auth_controller.dart';
+import '../features/profile/application/profile_controller.dart';
+import '../features/profile/data/local_auth_repository.dart';
+import '../features/profile/presentation/profile_page.dart';
+import '../features/profile/presentation/profile_scope.dart';
+import '../features/profile/presentation/widgets/profile_avatar_button.dart';
 import 'main_navigation_page.dart';
 import 'theme/app_theme.dart';
 
@@ -24,34 +30,56 @@ class _SudokuAppState extends State<SudokuApp> {
   ];
 
   Locale _locale = _defaultLocale;
+  AuthController? _authController;
+  ProfileController? _profileController;
+  final GlobalKey<NavigatorState> _rootNavigatorKey =
+      GlobalKey<NavigatorState>();
 
   @override
   void initState() {
     super.initState();
-    _loadSavedSettings();
+    _initializeApp();
   }
 
-  Future<void> _loadSavedSettings() async {
-    final SharedPreferences preferences = await SharedPreferences.getInstance();
-    final String? savedLanguageCode = preferences.getString(
-      _languagePreferenceKey,
-    );
+  Future<void> _initializeApp() async {
+    AuthController? authController;
+    ProfileController? profileController;
 
-    Locale? loadedLocale;
+    try {
+      final SharedPreferences preferences =
+          await SharedPreferences.getInstance();
+      final String? savedLanguageCode = preferences.getString(
+        _languagePreferenceKey,
+      );
+      final Locale? loadedLocale =
+          savedLanguageCode == null
+              ? null
+              : _localeFromLanguageCode(savedLanguageCode);
 
-    if (savedLanguageCode != null) {
-      loadedLocale = _localeFromLanguageCode(savedLanguageCode);
-    }
+      authController = AuthController(
+        repository: LocalAuthRepository(preferences: preferences),
+      );
+      profileController = ProfileController(authController: authController);
 
-    if (!mounted) {
-      return;
-    }
+      await authController.initialize();
+      await profileController.initialize();
 
-    if (loadedLocale != null) {
-      final Locale localeToApply = loadedLocale;
+      if (!mounted) {
+        authController.dispose();
+        profileController.dispose();
+        return;
+      }
+
       setState(() {
-        _locale = localeToApply;
+        _locale = loadedLocale ?? _locale;
+        _authController = authController;
+        _profileController = profileController;
       });
+    } catch (error, stackTrace) {
+      authController?.dispose();
+      profileController?.dispose();
+      debugPrint('Profile initialization failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
     }
   }
 
@@ -86,7 +114,11 @@ class _SudokuAppState extends State<SudokuApp> {
 
   @override
   Widget build(BuildContext context) {
+    final AuthController? authController = _authController;
+    final ProfileController? profileController = _profileController;
+
     return MaterialApp(
+      navigatorKey: _rootNavigatorKey,
       title: 'Sudoku',
       theme: darkBlueTheme,
       locale: _locale,
@@ -94,10 +126,59 @@ class _SudokuAppState extends State<SudokuApp> {
       supportedLocales: _supportedLocales,
       localeResolutionCallback:
           (Locale? locale, Iterable<Locale> _) => _resolveLocale(locale),
+      builder: (BuildContext context, Widget? child) {
+        final Widget resolvedChild = child ?? const SizedBox.shrink();
+        if (authController == null || profileController == null) {
+          return resolvedChild;
+        }
+
+        return ProfileScope(
+          authController: authController,
+          profileController: profileController,
+          child: Stack(
+            children: <Widget>[
+              resolvedChild,
+              Positioned(
+                top: 0,
+                right: 0,
+                child: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 8, right: 8),
+                    child: AnimatedBuilder(
+                      animation: authController,
+                      builder: (BuildContext context, Widget? _) {
+                        return ProfileAvatarButton(
+                          photoUrl: authController.session?.photoUrl,
+                          onPressed: () {
+                            _rootNavigatorKey.currentState?.push(
+                              MaterialPageRoute<void>(
+                                builder:
+                                    (BuildContext context) =>
+                                        const ProfilePage(),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
       home: MainNavigationPage(
         currentLocale: _locale,
         onLocaleChanged: _updateLocale,
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _profileController?.dispose();
+    _authController?.dispose();
+    super.dispose();
   }
 }
