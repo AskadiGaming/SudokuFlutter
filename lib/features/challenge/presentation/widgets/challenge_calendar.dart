@@ -7,12 +7,14 @@ class ChallengeCalendar extends StatelessWidget {
   const ChallengeCalendar({
     required this.entries,
     required this.selectedDate,
+    required this.showProgress,
     required this.onDateSelected,
     super.key,
   });
 
   final List<ChallengeDayEntry> entries;
   final DateTime? selectedDate;
+  final bool showProgress;
   final ValueChanged<DateTime> onDateSelected;
 
   @override
@@ -61,6 +63,10 @@ class ChallengeCalendar extends StatelessWidget {
                 entry.status == ChallengeDayStatus.notStarted
                     ? theme.colorScheme.onSurface
                     : theme.colorScheme.onPrimary;
+            final bool shouldShowProgress =
+                showProgress &&
+                entry.status == ChallengeDayStatus.inProgress &&
+                entry.progressPercent != null;
 
             return InkWell(
               key: Key(
@@ -82,11 +88,36 @@ class ChallengeCalendar extends StatelessWidget {
                           : null,
                 ),
                 child: Center(
-                  child: Text(
-                    '${entry.date.day}',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: textColor,
-                      fontWeight: FontWeight.w700,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 2,
+                    ),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: <Widget>[
+                          Text(
+                            '${entry.date.day}',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: textColor,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          if (shouldShowProgress) ...<Widget>[
+                            const SizedBox(height: 4),
+                            Text(
+                              '(${entry.progressPercent}%)',
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                color: textColor,
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
                   ),
                 ),

@@ -30,6 +30,7 @@ class _ChallengePageState extends State<ChallengePage> {
       widget.controller ?? ChallengeController(repository: _repository);
   late final bool _ownsController = widget.controller == null;
   bool _isStartingRound = false;
+  bool _showProgress = false;
 
   @override
   void initState() {
@@ -91,6 +92,19 @@ class _ChallengePageState extends State<ChallengePage> {
                           },
                         );
                       }).toList(),
+                ),
+                const SizedBox(height: 8),
+                CheckboxListTile(
+                  value: _showProgress,
+                  onChanged: (bool? value) {
+                    setState(() {
+                      _showProgress = value ?? false;
+                    });
+                  },
+                  title: Text(l10n.challengeShowProgress),
+                  dense: true,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  contentPadding: EdgeInsets.zero,
                 ),
                 const SizedBox(height: 16),
                 Row(
@@ -190,6 +204,7 @@ class _ChallengePageState extends State<ChallengePage> {
     return ChallengeCalendar(
       entries: entries,
       selectedDate: _controller.selectedDate,
+      showProgress: _showProgress,
       onDateSelected: (DateTime date) {
         _controller.selectDate(date);
       },

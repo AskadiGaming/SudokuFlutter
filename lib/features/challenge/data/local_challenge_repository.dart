@@ -37,24 +37,47 @@ class LocalChallengeRepository implements ChallengeRepository {
     final DateTime displayStart = _firstDisplayedDay(normalizedMonth);
     final DateTime displayEnd = displayStart.add(const Duration(days: 41));
 
-    final List<Map<String, Object?>> rows = await db.query(
-      'challenge_progress',
-      columns: <String>['challenge_date', 'is_completed'],
-      where: 'difficulty = ? AND challenge_date >= ? AND challenge_date <= ?',
-      whereArgs: <Object>[
+    final List<Map<String, Object?>> rows = await db.rawQuery(
+      '''
+      SELECT
+        cp.challenge_date AS challenge_date,
+        cp.is_completed AS is_completed,
+        cp.current_grid AS current_grid,
+        s.sudoku_string AS sudoku_string
+      FROM challenge_progress cp
+      INNER JOIN sudoku s ON s.id = cp.sudoku_id
+      WHERE cp.difficulty = ? AND cp.challenge_date >= ? AND cp.challenge_date <= ?
+      ''',
+      <Object>[
         difficulty.storageValue,
         _toIsoDate(displayStart),
         _toIsoDate(displayEnd),
       ],
     );
 
-    final Map<String, ChallengeDayStatus> statusesByDate =
-        <String, ChallengeDayStatus>{};
+    final Map<String, ChallengeDayEntry> entriesByDate =
+        <String, ChallengeDayEntry>{};
     for (final Map<String, Object?> row in rows) {
-      statusesByDate[row['challenge_date']! as String] =
-          (row['is_completed']! as int) == 1
+      final String challengeDate = row['challenge_date']! as String;
+      final bool isCompleted = (row['is_completed']! as int) == 1;
+      final ChallengeDayStatus status =
+          isCompleted
               ? ChallengeDayStatus.completed
               : ChallengeDayStatus.inProgress;
+      final int? progressPercent =
+          isCompleted
+              ? null
+              : _calculateProgressPercent(
+                initialGrid: row['sudoku_string']! as String,
+                currentGrid: row['current_grid']! as String,
+              );
+      final DateTime date = DateTime.parse(challengeDate);
+      entriesByDate[challengeDate] = ChallengeDayEntry(
+        date: date,
+        isInCurrentMonth: date.month == normalizedMonth.month,
+        status: status,
+        progressPercent: progressPercent,
+      );
     }
 
     final List<ChallengeDayEntry> entries = <ChallengeDayEntry>[];
@@ -62,11 +85,12 @@ class LocalChallengeRepository implements ChallengeRepository {
       final DateTime day = displayStart.add(Duration(days: offset));
       final String dayKey = _toIsoDate(day);
       entries.add(
-        ChallengeDayEntry(
-          date: day,
-          isInCurrentMonth: day.month == normalizedMonth.month,
-          status: statusesByDate[dayKey] ?? ChallengeDayStatus.notStarted,
-        ),
+        entriesByDate[dayKey] ??
+            ChallengeDayEntry(
+              date: day,
+              isInCurrentMonth: day.month == normalizedMonth.month,
+              status: ChallengeDayStatus.notStarted,
+            ),
       );
     }
 
@@ -247,6 +271,34 @@ class LocalChallengeRepository implements ChallengeRepository {
     final String month = normalized.month.toString().padLeft(2, '0');
     final String day = normalized.day.toString().padLeft(2, '0');
     return '$year-$month-$day';
+  }
+
+  int _calculateProgressPercent({
+    required String initialGrid,
+    required String currentGrid,
+  }) {
+    final int initialFilled = _countFilledCells(initialGrid);
+    final int currentFilled = _countFilledCells(currentGrid);
+    final int editableCellCount = 81 - initialFilled;
+    if (editableCellCount <= 0) {
+      return 100;
+    }
+
+    final int filledEditableCells = (currentFilled - initialFilled).clamp(
+      0,
+      81,
+    );
+    return ((filledEditableCells / editableCellCount) * 100).round();
+  }
+
+  int _countFilledCells(String grid) {
+    int count = 0;
+    for (int index = 0; index < grid.length; index++) {
+      if (grid[index] != '0') {
+        count++;
+      }
+    }
+    return count;
   }
 }
 

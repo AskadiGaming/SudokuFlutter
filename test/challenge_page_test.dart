@@ -25,11 +25,16 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Play'), findsOneWidget);
+      expect(find.text('(42%)'), findsNothing);
+
+      await tester.tap(find.text('Show progress'));
+      await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const Key('challenge-day-2026-6-2')));
       await tester.pumpAndSettle();
 
       expect(find.text('Resume'), findsOneWidget);
+      expect(find.text('(42%)'), findsOneWidget);
       expect(find.byKey(const Key('challenge-day-2026-5-31')), findsNothing);
       expect(find.byKey(const Key('challenge-day-2026-7-1')), findsNothing);
 
@@ -66,6 +71,7 @@ class _ChallengePageRepository implements ChallengeRepository {
               date.day == 2
                   ? ChallengeDayStatus.inProgress
                   : ChallengeDayStatus.notStarted,
+          progressPercent: date.day == 2 ? 42 : null,
         );
       }),
     );

@@ -72,6 +72,7 @@ class _FakeChallengeRepository implements ChallengeRepository {
           date: date,
           isInCurrentMonth: date.month == month.month,
           status: status,
+          progressPercent: status == ChallengeDayStatus.inProgress ? 42 : null,
         );
       },
     );

@@ -29,6 +29,7 @@
   "challengeMonthNext": "Next month",
   "challengePlay": "Play",
   "challengeResume": "Resume",
+  "challengeShowProgress": "Show progress",
   "challengeBackToCalendar": "Back to calendar",
   "challengeLoadingError": "Failed to load challenge",
   "sudokuSolvedTitle": "Sudoku solved",
