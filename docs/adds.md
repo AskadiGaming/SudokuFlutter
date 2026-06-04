@@ -4,6 +4,10 @@
 Vor jedem Start einer Quickmatch-Runde soll ein Unity Interstitial Ad angezeigt werden.  
 Danach startet die Runde wie gewohnt. Wenn kein Ad verfuegbar ist oder ein Fehler auftritt, soll die Runde trotzdem starten (Fail-Open).
 
+## Offline-Ausnahme
+Unity Ads sind die einzige bewusst akzeptierte Online-Ausnahme in der App.
+Ein Ausfall der Ads oder eine fehlende Internetverbindung darf Profil, Navigation und den eigentlichen Spielfluss nicht blockieren.
+
 ## Ausgangslage
 - Der Spielstart passiert aktuell in `QuickmatchPage` (`lib/main.dart`) direkt beim Klick auf `quickmatchPlay`.
 - Eine Ads-Feature-Struktur ist vorhanden (`lib/features/ads/{domain,application,infrastructure}`), aber noch ohne Implementierung.

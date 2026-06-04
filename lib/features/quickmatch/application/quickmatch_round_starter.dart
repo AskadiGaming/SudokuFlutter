@@ -42,7 +42,12 @@ class QuickmatchRoundStarter {
 
     _isStartingRound = true;
     try {
-      await _showAdBeforeRoundUseCase.execute();
+      try {
+        await _showAdBeforeRoundUseCase.execute();
+      } catch (error, stackTrace) {
+        debugPrint('Ad flow failed before quickmatch round: $error');
+        debugPrintStack(stackTrace: stackTrace);
+      }
     } finally {
       _isStartingRound = false;
     }

@@ -1,21 +1,17 @@
-import 'dart:async';
-
 import 'package:flutter/foundation.dart';
 
+import '../data/profile_repository.dart';
 import '../domain/profile_state.dart';
-import 'auth_controller.dart';
 
 class ProfileController extends ChangeNotifier {
-  ProfileController({required AuthController authController})
-    : _authController = authController {
-    _authController.addListener(_onSessionChanged);
-  }
+  ProfileController({required ProfileRepository repository})
+    : _repository = repository;
 
-  static const String defaultUsername = 'SudokuPlayer#123123';
+  static const String defaultUsername = 'SudokuPlayer';
 
-  final AuthController _authController;
+  final ProfileRepository _repository;
 
-  ProfileState _state = const ProfileState(effectiveUsername: defaultUsername);
+  ProfileState _state = const ProfileState(username: defaultUsername);
   bool _isLoading = false;
   bool _isInitialized = false;
 
@@ -26,38 +22,37 @@ class ProfileController extends ChangeNotifier {
     if (_isInitialized) {
       return;
     }
-    await _syncWithSession();
-    _isInitialized = true;
-  }
-
-  @override
-  void dispose() {
-    _authController.removeListener(_onSessionChanged);
-    super.dispose();
-  }
-
-  void _onSessionChanged() {
-    unawaited(_syncWithSession());
-  }
-
-  Future<void> _syncWithSession() async {
-    if (!_authController.isAuthenticated) {
-      _state = const ProfileState(effectiveUsername: defaultUsername);
-      notifyListeners();
-      return;
-    }
 
     _isLoading = true;
     notifyListeners();
 
-    final String? displayName = _authController.session?.displayName?.trim();
-    _state = ProfileState(
-      effectiveUsername:
-          (displayName == null || displayName.isEmpty)
-              ? defaultUsername
-              : displayName,
-    );
-    _isLoading = false;
+    try {
+      final String? storedUsername = await _repository.loadUsername();
+      _state = ProfileState(username: _normalizeUsername(storedUsername));
+      _isInitialized = true;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> updateUsername(String username) async {
+    final String normalizedUsername = _normalizeUsername(username);
+    if (normalizedUsername == _state.username) {
+      return;
+    }
+
+    _state = _state.copyWith(username: normalizedUsername);
     notifyListeners();
+
+    await _repository.saveUsername(normalizedUsername);
+  }
+
+  String _normalizeUsername(String? username) {
+    final String? trimmedUsername = username?.trim();
+    if (trimmedUsername == null || trimmedUsername.isEmpty) {
+      return defaultUsername;
+    }
+    return trimmedUsername;
   }
 }

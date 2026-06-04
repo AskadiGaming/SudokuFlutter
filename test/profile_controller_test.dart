@@ -1,80 +1,70 @@
-import 'dart:async';
-
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hello_world_app/features/profile/application/auth_controller.dart';
 import 'package:hello_world_app/features/profile/application/profile_controller.dart';
-import 'package:hello_world_app/features/profile/data/auth_repository.dart';
-import 'package:hello_world_app/features/profile/domain/user_session.dart';
+import 'package:hello_world_app/features/profile/data/profile_repository.dart';
 
 void main() {
   group('ProfileController', () {
-    test(
-      'uses default username when no authenticated session is available',
-      () async {
-        final FakeAuthRepository authRepository = FakeAuthRepository();
-        final AuthController authController = AuthController(
-          repository: authRepository,
-        );
-        final ProfileController profileController = ProfileController(
-          authController: authController,
-        );
-
-        await authController.initialize();
-        await profileController.initialize();
-
-      expect(profileController.state.effectiveUsername, 'SudokuPlayer#123123');
-
-        profileController.dispose();
-        authController.dispose();
-      },
-    );
-
-    test('uses session display name when available', () async {
-      final FakeAuthRepository authRepository = FakeAuthRepository(
-        initialSession: const UserSession.authenticated(
-          userId: 'local_profile_user',
-          displayName: 'Alex',
-        ),
-      );
-      final AuthController authController = AuthController(
-        repository: authRepository,
-      );
+    test('shows SudokuPlayer when no username is stored', () async {
+      final _FakeProfileRepository repository = _FakeProfileRepository();
       final ProfileController profileController = ProfileController(
-        authController: authController,
+        repository: repository,
       );
 
-      await authController.initialize();
       await profileController.initialize();
 
-      expect(profileController.state.effectiveUsername, 'Alex');
-
+      expect(profileController.state.username, 'SudokuPlayer');
       profileController.dispose();
-      authController.dispose();
     });
+
+    test('loads stored username', () async {
+      final _FakeProfileRepository repository = _FakeProfileRepository(
+        storedUsername: 'Alex',
+      );
+      final ProfileController profileController = ProfileController(
+        repository: repository,
+      );
+
+      await profileController.initialize();
+
+      expect(profileController.state.username, 'Alex');
+      profileController.dispose();
+    });
+
+    test(
+      'saves edited username trimmed and falls back on empty input',
+      () async {
+        final _FakeProfileRepository repository = _FakeProfileRepository(
+          storedUsername: 'Alex',
+        );
+        final ProfileController profileController = ProfileController(
+          repository: repository,
+        );
+
+        await profileController.initialize();
+        await profileController.updateUsername('  Mila  ');
+        expect(profileController.state.username, 'Mila');
+        expect(repository.savedUsernames, <String>['Mila']);
+
+        await profileController.updateUsername('   ');
+        expect(profileController.state.username, 'SudokuPlayer');
+        expect(repository.savedUsernames, <String>['Mila', 'SudokuPlayer']);
+        profileController.dispose();
+      },
+    );
   });
 }
 
-class FakeAuthRepository implements AuthRepository {
-  FakeAuthRepository({UserSession? initialSession})
-    : _currentSession = initialSession;
+class _FakeProfileRepository implements ProfileRepository {
+  _FakeProfileRepository({this.storedUsername});
 
-  final StreamController<UserSession?> _controller =
-      StreamController<UserSession?>.broadcast();
-  final UserSession? _currentSession;
+  final String? storedUsername;
+  final List<String> savedUsernames = <String>[];
 
   @override
-  UserSession? get currentSession => _currentSession;
+  Future<String?> loadUsername() async => storedUsername;
 
   @override
-  Stream<UserSession?> authStateChanges() => _controller.stream;
-
-  @override
-  Future<void> restoreSession() async {
-    _controller.add(_currentSession);
-  }
-
-  @override
-  void dispose() {
-    _controller.close();
+  Future<void> saveUsername(String username) async {
+    savedUsernames.add(username);
   }
 }

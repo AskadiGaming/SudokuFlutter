@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../application/auth_controller.dart';
 import '../application/profile_controller.dart';
-import '../domain/user_session.dart';
 import 'profile_scope.dart';
 
 class ProfilePage extends StatelessWidget {
@@ -10,39 +8,27 @@ class ProfilePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ProfileScope scope = ProfileScope.of(context);
-    final AuthController authController = scope.authController;
-    final ProfileController profileController = scope.profileController;
+    final ProfileController profileController =
+        ProfileScope.of(context).profileController;
 
     return AnimatedBuilder(
-      animation: Listenable.merge(<Listenable>[
-        authController,
-        profileController,
-      ]),
+      animation: profileController,
       builder: (BuildContext context, Widget? _) {
-        final UserSession? session = authController.session;
-        final String username = profileController.state.effectiveUsername;
+        final String username = profileController.state.username;
 
         return Scaffold(
           appBar: AppBar(title: const Text('Profil')),
           body: ListView(
             padding: const EdgeInsets.all(16),
             children: <Widget>[
-              _ProfileHeader(session: session, username: username),
-              const SizedBox(height: 20),
-              const ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text('Username'),
-                subtitle: Text(
-                  'Der Username ist aktuell fest vorgegeben und kann nicht geaendert werden.',
-                ),
+              _ProfileHeader(
+                username: username,
+                onEdit:
+                    () => _showEditUsernameDialog(context, profileController),
               ),
-              if (authController.errorMessage != null) ...<Widget>[
+              if (profileController.isLoading) ...<Widget>[
                 const SizedBox(height: 12),
-                Text(
-                  authController.errorMessage!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                ),
+                const LinearProgressIndicator(),
               ],
             ],
           ),
@@ -50,33 +36,86 @@ class ProfilePage extends StatelessWidget {
       },
     );
   }
+
+  Future<void> _showEditUsernameDialog(
+    BuildContext context,
+    ProfileController profileController,
+  ) async {
+    final TextEditingController textController = TextEditingController(
+      text: profileController.state.username,
+    );
+
+    final String? editedUsername = await showDialog<String>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Username bearbeiten'),
+          content: TextField(
+            controller: textController,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: 'Username',
+              hintText: 'SudokuPlayer',
+            ),
+            textInputAction: TextInputAction.done,
+            onSubmitted: (String value) {
+              Navigator.of(dialogContext).pop(value);
+            },
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Abbrechen'),
+            ),
+            FilledButton(
+              onPressed:
+                  () => Navigator.of(dialogContext).pop(textController.text),
+              child: const Text('Speichern'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (editedUsername == null) {
+      return;
+    }
+
+    await profileController.updateUsername(editedUsername);
+  }
 }
 
 class _ProfileHeader extends StatelessWidget {
-  const _ProfileHeader({required this.session, required this.username});
+  const _ProfileHeader({required this.username, required this.onEdit});
 
-  final UserSession? session;
   final String username;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
-    final String? photoUrl = session?.photoUrl?.trim();
-    final bool hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
-
     return Row(
       children: <Widget>[
-        CircleAvatar(
-          radius: 28,
-          backgroundImage: hasPhoto ? NetworkImage(photoUrl) : null,
-          child: hasPhoto ? null : const Icon(Icons.person),
-        ),
+        const CircleAvatar(radius: 28, child: Icon(Icons.person)),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               Text(username, style: Theme.of(context).textTheme.titleLarge),
-              const Text('Lokales Profil'),
+              InkWell(
+                onTap: onEdit,
+                child: const Padding(
+                  padding: EdgeInsets.only(top: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Icon(Icons.edit, size: 14),
+                      SizedBox(width: 4),
+                      Text('bearbeiten'),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         ),

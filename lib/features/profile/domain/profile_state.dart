@@ -1,11 +1,9 @@
 class ProfileState {
-  const ProfileState({required this.effectiveUsername});
+  const ProfileState({required this.username});
 
-  final String effectiveUsername;
+  final String username;
 
-  ProfileState copyWith({String? effectiveUsername}) {
-    return ProfileState(
-      effectiveUsername: effectiveUsername ?? this.effectiveUsername,
-    );
+  ProfileState copyWith({String? username}) {
+    return ProfileState(username: username ?? this.username);
   }
 }

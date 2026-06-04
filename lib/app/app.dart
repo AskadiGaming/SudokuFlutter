@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../features/profile/application/auth_controller.dart';
 import '../features/profile/application/profile_controller.dart';
-import '../features/profile/data/local_auth_repository.dart';
+import '../features/profile/data/local_profile_repository.dart';
 import '../features/profile/presentation/profile_page.dart';
 import '../features/profile/presentation/profile_scope.dart';
 import '../features/profile/presentation/widgets/profile_avatar_button.dart';
@@ -30,7 +29,6 @@ class _SudokuAppState extends State<SudokuApp> {
   ];
 
   Locale _locale = _defaultLocale;
-  AuthController? _authController;
   ProfileController? _profileController;
   final GlobalKey<NavigatorState> _rootNavigatorKey =
       GlobalKey<NavigatorState>();
@@ -42,7 +40,6 @@ class _SudokuAppState extends State<SudokuApp> {
   }
 
   Future<void> _initializeApp() async {
-    AuthController? authController;
     ProfileController? profileController;
 
     try {
@@ -56,27 +53,21 @@ class _SudokuAppState extends State<SudokuApp> {
               ? null
               : _localeFromLanguageCode(savedLanguageCode);
 
-      authController = AuthController(
-        repository: LocalAuthRepository(preferences: preferences),
+      profileController = ProfileController(
+        repository: LocalProfileRepository(preferences: preferences),
       );
-      profileController = ProfileController(authController: authController);
-
-      await authController.initialize();
       await profileController.initialize();
 
       if (!mounted) {
-        authController.dispose();
         profileController.dispose();
         return;
       }
 
       setState(() {
         _locale = loadedLocale ?? _locale;
-        _authController = authController;
         _profileController = profileController;
       });
     } catch (error, stackTrace) {
-      authController?.dispose();
       profileController?.dispose();
       debugPrint('Profile initialization failed: $error');
       debugPrintStack(stackTrace: stackTrace);
@@ -114,7 +105,6 @@ class _SudokuAppState extends State<SudokuApp> {
 
   @override
   Widget build(BuildContext context) {
-    final AuthController? authController = _authController;
     final ProfileController? profileController = _profileController;
 
     return MaterialApp(
@@ -128,12 +118,11 @@ class _SudokuAppState extends State<SudokuApp> {
           (Locale? locale, Iterable<Locale> _) => _resolveLocale(locale),
       builder: (BuildContext context, Widget? child) {
         final Widget resolvedChild = child ?? const SizedBox.shrink();
-        if (authController == null || profileController == null) {
+        if (profileController == null) {
           return resolvedChild;
         }
 
         return ProfileScope(
-          authController: authController,
           profileController: profileController,
           child: Stack(
             children: <Widget>[
@@ -144,20 +133,13 @@ class _SudokuAppState extends State<SudokuApp> {
                 child: SafeArea(
                   child: Padding(
                     padding: const EdgeInsets.only(top: 8, right: 8),
-                    child: AnimatedBuilder(
-                      animation: authController,
-                      builder: (BuildContext context, Widget? _) {
-                        return ProfileAvatarButton(
-                          photoUrl: authController.session?.photoUrl,
-                          onPressed: () {
-                            _rootNavigatorKey.currentState?.push(
-                              MaterialPageRoute<void>(
-                                builder:
-                                    (BuildContext context) =>
-                                        const ProfilePage(),
-                              ),
-                            );
-                          },
+                    child: ProfileAvatarButton(
+                      onPressed: () {
+                        _rootNavigatorKey.currentState?.push(
+                          MaterialPageRoute<void>(
+                            builder:
+                                (BuildContext context) => const ProfilePage(),
+                          ),
                         );
                       },
                     ),
@@ -178,7 +160,6 @@ class _SudokuAppState extends State<SudokuApp> {
   @override
   void dispose() {
     _profileController?.dispose();
-    _authController?.dispose();
     super.dispose();
   }
 }
