@@ -187,14 +187,12 @@ class _ChallengePageState extends State<ChallengePage> {
 
     final List<ChallengeDayEntry> entries =
         _controller.monthData?.entries ?? const <ChallengeDayEntry>[];
-    return SingleChildScrollView(
-      child: ChallengeCalendar(
-        entries: entries,
-        selectedDate: _controller.selectedDate,
-        onDateSelected: (DateTime date) {
-          _controller.selectDate(date);
-        },
-      ),
+    return ChallengeCalendar(
+      entries: entries,
+      selectedDate: _controller.selectedDate,
+      onDateSelected: (DateTime date) {
+        _controller.selectDate(date);
+      },
     );
   }
 

@@ -30,6 +30,17 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Resume'), findsOneWidget);
+      expect(find.byKey(const Key('challenge-day-2026-5-31')), findsNothing);
+      expect(find.byKey(const Key('challenge-day-2026-7-1')), findsNothing);
+
+      final AnimatedContainer startedDay = tester.widget<AnimatedContainer>(
+        find.descendant(
+          of: find.byKey(const Key('challenge-day-2026-6-2')),
+          matching: find.byType(AnimatedContainer),
+        ),
+      );
+      final BoxDecoration decoration = startedDay.decoration! as BoxDecoration;
+      expect(decoration.color, const Color(0xFF8FD3FF));
     },
   );
 }
