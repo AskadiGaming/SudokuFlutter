@@ -5,6 +5,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
+import '../../challenge/data/challenge_repository.dart';
+import '../../challenge/data/local_challenge_repository.dart';
+import '../../challenge/domain/challenge_round_data.dart';
 import '../data/local_sudoku_puzzle_repository.dart';
 import '../data/sudoku_puzzle_repository.dart';
 import '../dev/admin_test_sudoku_override.dart';
@@ -32,6 +35,7 @@ class PlaySudokuPage extends StatefulWidget {
     required this.roundConfig,
     this.onReplayRoundRequested,
     this.repository,
+    this.challengeRepository,
     this.adminTestOverrideConfig,
     this.adminTestOverrideEnabled,
     this.random,
@@ -45,6 +49,7 @@ class PlaySudokuPage extends StatefulWidget {
   )?
   onReplayRoundRequested;
   final SudokuPuzzleRepository? repository;
+  final ChallengeRepository? challengeRepository;
   final AdminTestSudokuConfig? adminTestOverrideConfig;
   final bool? adminTestOverrideEnabled;
   final Random? random;
@@ -61,6 +66,8 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
 
   late final SudokuPuzzleRepository _repository =
       widget.repository ?? LocalSudokuPuzzleRepository();
+  late final ChallengeRepository _challengeRepository =
+      widget.challengeRepository ?? LocalChallengeRepository();
   late final Random _random = widget.random ?? Random();
 
   late final AnimationController _rotationController;
@@ -95,6 +102,8 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
   bool _showSolvedOverlay = false;
   bool _isReplayStarting = false;
   final Set<int> _hiddenCellIndices = <int>{};
+  ChallengeRoundData? _activeChallengeRound;
+  Timer? _challengeAutosaveTimer;
 
   @override
   void initState() {
@@ -157,23 +166,25 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
 
   Future<void> _loadPuzzle() async {
     try {
-      final String puzzle = await _resolvePuzzleString();
-      final SudokuGridData parsed = parsePuzzle(puzzle);
+      final _LoadedPuzzleData loaded = await _resolvePuzzleData();
       if (!mounted) {
         return;
       }
       setState(() {
-        _gridData = parsed;
-        _isSolved = false;
+        _gridData = loaded.gridData;
+        _activeChallengeRound = loaded.challengeRoundData;
+        _isSolved = loaded.challengeRoundData?.isCompleted ?? false;
         _isFinishSequenceRunning = false;
-        _showSolvedOverlay = false;
+        _showSolvedOverlay = loaded.challengeRoundData?.isCompleted ?? false;
         _isReplayStarting = false;
         _hiddenCellIndices.clear();
         _rainDrops.clear();
         _lastRainUpdate = null;
       });
       _startModifierLifecycleIfNeeded();
-      _checkSolvedAndMaybeStartFinishSequence();
+      if (!(loaded.challengeRoundData?.isCompleted ?? false)) {
+        _checkSolvedAndMaybeStartFinishSequence();
+      }
     } catch (error) {
       if (!mounted) {
         return;
@@ -184,19 +195,44 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
     }
   }
 
-  Future<String> _resolvePuzzleString() async {
+  Future<_LoadedPuzzleData> _resolvePuzzleData() async {
     final AdminTestSudokuConfig? adminOverrideConfig =
         _readAdminOverrideConfig();
     final String? overridePuzzle = adminOverrideConfig?.normalizedSudokuString;
     if (overridePuzzle != null) {
       debugPrint('Admin test sudoku override applied.');
-      return overridePuzzle;
+      return _LoadedPuzzleData(gridData: parsePuzzle(overridePuzzle));
+    }
+
+    if (widget.roundConfig.mode == SudokuRoundMode.challenge) {
+      final DateTime? challengeDate = widget.roundConfig.challengeDate;
+      if (challengeDate == null) {
+        throw StateError('Challenge round requires a challenge date.');
+      }
+
+      final ChallengeRoundData roundData = await _challengeRepository
+          .loadOrCreateRoundData(
+            date: challengeDate,
+            difficulty: widget.roundConfig.difficulty,
+          );
+      return _LoadedPuzzleData(
+        gridData: _buildChallengeGridData(roundData),
+        challengeRoundData: roundData,
+      );
     }
 
     if (widget.roundConfig.mode == SudokuRoundMode.daily) {
-      return _repository.getOrCreateDailyPuzzle(DateTime.now());
+      return _LoadedPuzzleData(
+        gridData: parsePuzzle(
+          await _repository.getOrCreateDailyPuzzle(DateTime.now()),
+        ),
+      );
     }
-    return _repository.getRandomByDifficulty(widget.roundConfig.difficulty);
+    return _LoadedPuzzleData(
+      gridData: parsePuzzle(
+        await _repository.getRandomByDifficulty(widget.roundConfig.difficulty),
+      ),
+    );
   }
 
   AdminTestSudokuConfig? _readAdminOverrideConfig() {
@@ -269,6 +305,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
         );
       }
     });
+    _scheduleChallengeAutosave();
     _checkSolvedAndMaybeStartFinishSequence();
   }
 
@@ -299,6 +336,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
       return;
     }
 
+    await _flushChallengeAutosave(markCompleted: true);
     _modifierScheduler.stop();
     if (!mounted) {
       return;
@@ -335,6 +373,10 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
   }
 
   Future<void> _startReplayRound() async {
+    if (widget.roundConfig.mode == SudokuRoundMode.challenge) {
+      await Navigator.of(context).maybePop();
+      return;
+    }
     if (_isReplayStarting) {
       return;
     }
@@ -364,6 +406,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
                 roundConfig: widget.roundConfig,
                 onReplayRoundRequested: widget.onReplayRoundRequested,
                 repository: widget.repository,
+                challengeRepository: widget.challengeRepository,
                 adminTestOverrideConfig: widget.adminTestOverrideConfig,
                 adminTestOverrideEnabled: widget.adminTestOverrideEnabled,
                 random: widget.random,
@@ -382,6 +425,11 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
   @override
   void dispose() {
     _isDisposing = true;
+    if (_challengeAutosaveTimer != null) {
+      _challengeAutosaveTimer!.cancel();
+      _challengeAutosaveTimer = null;
+      unawaited(_flushChallengeAutosave());
+    }
     _modifierScheduler.dispose();
     _rotationController.dispose();
     _rotation90Controller.dispose();
@@ -495,6 +543,8 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
   Widget _buildSolvedOverlay(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final AppLocalizations? l10n = AppLocalizations.of(context);
+    final bool isChallengeRound =
+        widget.roundConfig.mode == SudokuRoundMode.challenge;
     return Positioned.fill(
       child: Container(
         color: theme.colorScheme.surface.withValues(alpha: 0.9),
@@ -516,7 +566,12 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
                           dimension: 18,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                        : Text(l10n?.sudokuPlayAgain ?? 'Play again'),
+                        : Text(
+                          isChallengeRound
+                              ? l10n?.challengeBackToCalendar ??
+                                  'Back to calendar'
+                              : l10n?.sudokuPlayAgain ?? 'Play again',
+                        ),
               ),
             ],
           ),
@@ -524,4 +579,85 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
       ),
     );
   }
+
+  SudokuGridData _buildChallengeGridData(ChallengeRoundData roundData) {
+    final SudokuGridData gridData = parsePuzzle(roundData.puzzleString);
+    final String currentGridString = roundData.currentGridString;
+    if (currentGridString.length != 81 ||
+        !RegExp(r'^[0-9]{81}$').hasMatch(currentGridString)) {
+      throw const FormatException('Invalid challenge progress grid.');
+    }
+
+    for (int index = 0; index < currentGridString.length; index++) {
+      final int row = index ~/ 9;
+      final int col = index % 9;
+      gridData.currentGrid[row][col] = int.parse(currentGridString[index]);
+    }
+    return gridData;
+  }
+
+  void _scheduleChallengeAutosave() {
+    if (widget.roundConfig.mode != SudokuRoundMode.challenge ||
+        _activeChallengeRound == null) {
+      return;
+    }
+    _challengeAutosaveTimer?.cancel();
+    _challengeAutosaveTimer = Timer(const Duration(milliseconds: 200), () {
+      unawaited(_flushChallengeAutosave());
+    });
+  }
+
+  Future<void> _flushChallengeAutosave({bool markCompleted = false}) async {
+    if (widget.roundConfig.mode != SudokuRoundMode.challenge) {
+      return;
+    }
+
+    _challengeAutosaveTimer?.cancel();
+    _challengeAutosaveTimer = null;
+    try {
+      await _persistChallengeProgress(isCompleted: markCompleted);
+    } catch (error, stackTrace) {
+      debugPrint('Challenge autosave failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+  }
+
+  Future<void> _persistChallengeProgress({required bool isCompleted}) async {
+    final ChallengeRoundData? roundData = _activeChallengeRound;
+    final SudokuGridData? gridData = _gridData;
+    if (roundData == null || gridData == null) {
+      return;
+    }
+
+    final String currentGrid = _gridToString(gridData.currentGrid);
+    final bool completed = roundData.isCompleted || isCompleted;
+    await _challengeRepository.saveChallengeProgress(
+      date: roundData.date,
+      difficulty: roundData.difficulty,
+      sudokuId: roundData.sudokuId,
+      currentGrid: currentGrid,
+      isCompleted: completed,
+    );
+    _activeChallengeRound = roundData.copyWith(
+      currentGridString: currentGrid,
+      isCompleted: completed,
+    );
+  }
+
+  String _gridToString(List<List<int>> grid) {
+    final StringBuffer buffer = StringBuffer();
+    for (final List<int> row in grid) {
+      for (final int value in row) {
+        buffer.write(value);
+      }
+    }
+    return buffer.toString();
+  }
+}
+
+class _LoadedPuzzleData {
+  const _LoadedPuzzleData({required this.gridData, this.challengeRoundData});
+
+  final SudokuGridData gridData;
+  final ChallengeRoundData? challengeRoundData;
 }

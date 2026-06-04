@@ -6,9 +6,13 @@ class SudokuRoundConfig {
     required this.difficulty,
     this.mode = SudokuRoundMode.normal,
     this.crazyModeEnabled = false,
+    this.challengeDate,
+    this.challengePuzzleId,
   });
 
   final SudokuDifficulty difficulty;
   final SudokuRoundMode mode;
   final bool crazyModeEnabled;
+  final DateTime? challengeDate;
+  final int? challengePuzzleId;
 }

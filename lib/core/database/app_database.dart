@@ -6,7 +6,7 @@ class AppDatabase {
 
   static final AppDatabase instance = AppDatabase._();
   static const String _databaseName = 'sudoku.db';
-  static const int _databaseVersion = 1;
+  static const int _databaseVersion = 2;
 
   Database? _database;
 
@@ -51,7 +51,51 @@ class AppDatabase {
     await db.execute(
       'CREATE UNIQUE INDEX idx_sudoku_daily_unique ON sudoku(daily) WHERE daily IS NOT NULL',
     );
+    await _createChallengeTables(db);
   }
 
-  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {}
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await _createChallengeTables(db);
+    }
+  }
+
+  Future<void> _createChallengeTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE challenge_puzzle (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        challenge_date TEXT NOT NULL,
+        difficulty TEXT NOT NULL CHECK(difficulty IN ('easy', 'medium', 'hard', 'extreme')),
+        sudoku_id INTEGER NOT NULL,
+        UNIQUE(challenge_date, difficulty)
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX idx_challenge_puzzle_date ON challenge_puzzle(challenge_date)',
+    );
+    await db.execute(
+      'CREATE UNIQUE INDEX idx_challenge_puzzle_date_difficulty ON challenge_puzzle(challenge_date, difficulty)',
+    );
+
+    await db.execute('''
+      CREATE TABLE challenge_progress (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        challenge_date TEXT NOT NULL,
+        difficulty TEXT NOT NULL CHECK(difficulty IN ('easy', 'medium', 'hard', 'extreme')),
+        sudoku_id INTEGER NOT NULL,
+        current_grid TEXT NOT NULL,
+        is_completed INTEGER NOT NULL DEFAULT 0 CHECK(is_completed IN (0, 1)),
+        started_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        completed_at TEXT NULL,
+        UNIQUE(challenge_date, difficulty)
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX idx_challenge_progress_date ON challenge_progress(challenge_date)',
+    );
+    await db.execute(
+      'CREATE UNIQUE INDEX idx_challenge_progress_date_difficulty ON challenge_progress(challenge_date, difficulty)',
+    );
+  }
 }

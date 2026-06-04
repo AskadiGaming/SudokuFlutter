@@ -1,1 +1,1 @@
-enum SudokuRoundMode { normal, daily }
+enum SudokuRoundMode { normal, daily, challenge }

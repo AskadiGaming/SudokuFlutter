@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
+import '../features/challenge/presentation/challenge_page.dart';
 import '../features/duell/presentation/duell_page.dart';
 import '../features/quickmatch/presentation/quickmatch_page.dart';
 import '../features/settings/presentation/settings_page.dart';
@@ -28,11 +29,13 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
     final List<String> titles = <String>[
       l10n.pageDuell,
       l10n.pageQuickmatch,
+      l10n.pageChallenge,
       l10n.pageSettings,
     ];
     final List<Widget> pages = <Widget>[
       const DuellPage(),
       const QuickmatchPage(),
+      const ChallengePage(),
       SettingsPage(
         currentLocale: widget.currentLocale,
         onLocaleChanged: widget.onLocaleChanged,
@@ -62,6 +65,10 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
           BottomNavigationBarItem(
             icon: const Icon(Icons.timer_outlined),
             label: l10n.tabQuickmatch,
+          ),
+          BottomNavigationBarItem(
+            icon: const Icon(Icons.calendar_month_outlined),
+            label: l10n.tabChallenge,
           ),
           BottomNavigationBarItem(
             icon: const Icon(Icons.settings),

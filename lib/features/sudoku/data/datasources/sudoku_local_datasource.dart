@@ -14,7 +14,7 @@ class SudokuLocalDataSource {
   Future<void>? _seedFuture;
 
   Future<String> getRandomByDifficulty(SudokuDifficulty difficulty) async {
-    await _ensureSeeded();
+    await ensureSeeded();
     final Database db = await _appDatabase.database;
     final List<Map<String, Object?>> rows = await db.query(
       'sudoku',
@@ -31,7 +31,7 @@ class SudokuLocalDataSource {
   }
 
   Future<String> getOrCreateDailySudoku(DateTime date) async {
-    await _ensureSeeded();
+    await ensureSeeded();
     final Database db = await _appDatabase.database;
     final String day = _toIsoDate(date);
 
@@ -79,7 +79,7 @@ class SudokuLocalDataSource {
     });
   }
 
-  Future<void> _ensureSeeded() async {
+  Future<void> ensureSeeded() async {
     final Future<void>? existingFuture = _seedFuture;
     if (existingFuture != null) {
       return existingFuture;
