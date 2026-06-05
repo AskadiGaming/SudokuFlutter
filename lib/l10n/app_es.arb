@@ -33,7 +33,15 @@
   "challengeBackToCalendar": "Volver al calendario",
   "challengeLoadingError": "Error al cargar el desafio",
   "sudokuSolvedTitle": "Sudoku resuelto",
-  "sudokuPlayAgain": "Jugar de nuevo"
+  "sudokuPlayAgain": "Jugar de nuevo",
+  "showCompletedSudokus": "Mostrar sudokus completados",
+  "completedSudokusTitle": "Sudokus completados",
+  "completedSudokusEmpty": "Todavia no hay sudokus completados",
+  "completedSudokusDurationLabel": "Duracion",
+  "completedSudokusCompletedAtLabel": "Completado el",
+  "completedSudokusLoadingError": "Error al cargar el historial",
+  "dialogCancel": "Cancelar",
+  "dialogSave": "Guardar"
 }
 
 

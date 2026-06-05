@@ -33,7 +33,15 @@
   "challengeBackToCalendar": "Zurück zum Kalender",
   "challengeLoadingError": "Fehler beim Laden der Challenge",
   "sudokuSolvedTitle": "Sudoku gelöst",
-  "sudokuPlayAgain": "Erneut spielen"
+  "sudokuPlayAgain": "Erneut spielen",
+  "showCompletedSudokus": "Abgeschlossene Sudokus anzeigen",
+  "completedSudokusTitle": "Abgeschlossene Sudokus",
+  "completedSudokusEmpty": "Noch keine abgeschlossenen Sudokus",
+  "completedSudokusDurationLabel": "Dauer",
+  "completedSudokusCompletedAtLabel": "Abgeschlossen am",
+  "completedSudokusLoadingError": "Fehler beim Laden der Historie",
+  "dialogCancel": "Abbrechen",
+  "dialogSave": "Speichern"
 }
 
 

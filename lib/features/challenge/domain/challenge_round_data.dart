@@ -8,6 +8,8 @@ class ChallengeRoundData {
     required this.puzzleString,
     required this.currentGridString,
     required this.isCompleted,
+    required this.startedAt,
+    this.completedAt,
   });
 
   final DateTime date;
@@ -16,8 +18,14 @@ class ChallengeRoundData {
   final String puzzleString;
   final String currentGridString;
   final bool isCompleted;
+  final DateTime startedAt;
+  final DateTime? completedAt;
 
-  ChallengeRoundData copyWith({String? currentGridString, bool? isCompleted}) {
+  ChallengeRoundData copyWith({
+    String? currentGridString,
+    bool? isCompleted,
+    DateTime? completedAt,
+  }) {
     return ChallengeRoundData(
       date: date,
       difficulty: difficulty,
@@ -25,6 +33,8 @@ class ChallengeRoundData {
       puzzleString: puzzleString,
       currentGridString: currentGridString ?? this.currentGridString,
       isCompleted: isCompleted ?? this.isCompleted,
+      startedAt: startedAt,
+      completedAt: completedAt ?? this.completedAt,
     );
   }
 }

@@ -33,7 +33,15 @@
   "challengeBackToCalendar": "Back to calendar",
   "challengeLoadingError": "Failed to load challenge",
   "sudokuSolvedTitle": "Sudoku solved",
-  "sudokuPlayAgain": "Play again"
+  "sudokuPlayAgain": "Play again",
+  "showCompletedSudokus": "Show completed sudokus",
+  "completedSudokusTitle": "Completed sudokus",
+  "completedSudokusEmpty": "No completed sudokus yet",
+  "completedSudokusDurationLabel": "Duration",
+  "completedSudokusCompletedAtLabel": "Completed at",
+  "completedSudokusLoadingError": "Error loading history",
+  "dialogCancel": "Cancel",
+  "dialogSave": "Save"
 }
 
 

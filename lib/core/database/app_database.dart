@@ -6,7 +6,7 @@ class AppDatabase {
 
   static final AppDatabase instance = AppDatabase._();
   static const String _databaseName = 'sudoku.db';
-  static const int _databaseVersion = 2;
+  static const int _databaseVersion = 3;
 
   Database? _database;
 
@@ -52,11 +52,15 @@ class AppDatabase {
       'CREATE UNIQUE INDEX idx_sudoku_daily_unique ON sudoku(daily) WHERE daily IS NOT NULL',
     );
     await _createChallengeTables(db);
+    await _createCompletedSudokuLogTable(db);
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       await _createChallengeTables(db);
+    }
+    if (oldVersion < 3) {
+      await _createCompletedSudokuLogTable(db);
     }
   }
 
@@ -96,6 +100,24 @@ class AppDatabase {
     );
     await db.execute(
       'CREATE UNIQUE INDEX idx_challenge_progress_date_difficulty ON challenge_progress(challenge_date, difficulty)',
+    );
+  }
+
+  Future<void> _createCompletedSudokuLogTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE completed_sudoku_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        difficulty TEXT NOT NULL CHECK(difficulty IN ('easy', 'medium', 'hard', 'extreme')),
+        mode TEXT NOT NULL CHECK(mode IN ('normal', 'daily', 'challenge')),
+        started_at TEXT NOT NULL,
+        completed_at TEXT NOT NULL,
+        duration_seconds INTEGER NOT NULL,
+        challenge_date TEXT NULL,
+        source_sudoku_id INTEGER NULL
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX idx_completed_sudoku_log_completed_at ON completed_sudoku_log(completed_at DESC)',
     );
   }
 }

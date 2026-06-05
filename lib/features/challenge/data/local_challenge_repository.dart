@@ -141,6 +141,7 @@ class LocalChallengeRepository implements ChallengeRepository {
           puzzleString: puzzle.puzzleString,
           currentGridString: puzzle.puzzleString,
           isCompleted: false,
+          startedAt: DateTime.parse(now),
         );
       }
 
@@ -152,6 +153,11 @@ class LocalChallengeRepository implements ChallengeRepository {
         puzzleString: puzzle.puzzleString,
         currentGridString: row['current_grid']! as String,
         isCompleted: (row['is_completed']! as int) == 1,
+        startedAt: DateTime.parse(row['started_at']! as String),
+        completedAt:
+            row['completed_at'] == null
+                ? null
+                : DateTime.parse(row['completed_at']! as String),
       );
     });
   }

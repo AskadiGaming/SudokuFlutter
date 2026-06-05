@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 import '../application/profile_controller.dart';
+import '../../sudoku_history/data/completed_sudoku_log_repository.dart';
+import '../../sudoku_history/presentation/completed_sudoku_log_page.dart';
 import 'profile_scope.dart';
 
 class ProfilePage extends StatelessWidget {
-  const ProfilePage({super.key});
+  const ProfilePage({this.completedSudokuLogRepository, super.key});
+
+  final CompletedSudokuLogRepository? completedSudokuLogRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -15,6 +20,7 @@ class ProfilePage extends StatelessWidget {
       animation: profileController,
       builder: (BuildContext context, Widget? _) {
         final String username = profileController.state.username;
+        final AppLocalizations l10n = AppLocalizations.of(context)!;
 
         return Scaffold(
           appBar: AppBar(title: const Text('Profil')),
@@ -25,6 +31,27 @@ class ProfilePage extends StatelessWidget {
                 username: username,
                 onEdit:
                     () => _showEditUsernameDialog(context, profileController),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                tileColor:
+                    Theme.of(context).colorScheme.surfaceContainerHighest,
+                leading: const Icon(Icons.history),
+                title: Text(l10n.showCompletedSudokus),
+                trailing: const Icon(Icons.chevron_right),
+                onTap:
+                    () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder:
+                            (BuildContext context) => CompletedSudokuLogPage(
+                              repository: completedSudokuLogRepository,
+                            ),
+                      ),
+                    ),
               ),
               if (profileController.isLoading) ...<Widget>[
                 const SizedBox(height: 12),
@@ -41,6 +68,7 @@ class ProfilePage extends StatelessWidget {
     BuildContext context,
     ProfileController profileController,
   ) async {
+    final AppLocalizations l10n = AppLocalizations.of(context)!;
     final TextEditingController textController = TextEditingController(
       text: profileController.state.username,
     );
@@ -65,12 +93,12 @@ class ProfilePage extends StatelessWidget {
           actions: <Widget>[
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Abbrechen'),
+              child: Text(l10n.dialogCancel),
             ),
             FilledButton(
               onPressed:
                   () => Navigator.of(dialogContext).pop(textController.text),
-              child: const Text('Speichern'),
+              child: Text(l10n.dialogSave),
             ),
           ],
         );

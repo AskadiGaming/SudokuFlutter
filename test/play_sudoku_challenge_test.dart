@@ -41,6 +41,7 @@ void main() {
                 '000000000'
                 '000000000',
             isCompleted: false,
+            startedAt: DateTime(2026, 6, 4, 9),
           ),
         );
 
@@ -103,6 +104,8 @@ void main() {
                 '287419635'
                 '345286179',
             isCompleted: true,
+            startedAt: DateTime(2026, 6, 4, 9),
+            completedAt: DateTime(2026, 6, 4, 9, 12),
           ),
         );
 

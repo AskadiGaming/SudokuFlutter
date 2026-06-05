@@ -5,12 +5,16 @@ import 'package:hello_world_app/features/sudoku/data/sudoku_puzzle_repository.da
 import 'package:hello_world_app/features/sudoku/domain/sudoku_difficulty.dart';
 import 'package:hello_world_app/features/sudoku/domain/sudoku_round_config.dart';
 import 'package:hello_world_app/features/sudoku/presentation/play_sudoku_page.dart';
+import 'package:hello_world_app/features/sudoku_history/data/completed_sudoku_log_repository.dart';
+import 'package:hello_world_app/features/sudoku_history/domain/completed_sudoku_entry.dart';
 
 void main() {
   testWidgets('runs finish sequence, locks interaction and shows replay CTA', (
     WidgetTester tester,
   ) async {
     int replayCalls = 0;
+    final _RecordingCompletedSudokuLogRepository historyRepository =
+        _RecordingCompletedSudokuLogRepository();
     await tester.pumpWidget(
       MaterialApp(
         locale: const Locale('de'),
@@ -24,6 +28,7 @@ void main() {
             puzzle:
                 '534678912672195348198342567859761423426853791713924856961537284287419635345286170',
           ),
+          completedSudokuLogRepository: historyRepository,
           adminTestOverrideEnabled: false,
           onReplayRoundRequested: (
             BuildContext context,
@@ -60,6 +65,12 @@ void main() {
     final AppLocalizations l10n = AppLocalizations.of(context)!;
     expect(find.text(l10n.sudokuSolvedTitle), findsOneWidget);
     expect(find.text(l10n.sudokuPlayAgain), findsOneWidget);
+    expect(historyRepository.entries, hasLength(1));
+    expect(historyRepository.entries.single.difficulty, SudokuDifficulty.easy);
+    expect(
+      historyRepository.entries.single.durationSeconds,
+      greaterThanOrEqualTo(0),
+    );
 
     await tester.tap(find.text(l10n.sudokuPlayAgain));
     await tester.pump();
@@ -78,4 +89,17 @@ class _FakeSudokuRepository implements SudokuPuzzleRepository {
   @override
   Future<String> getRandomByDifficulty(SudokuDifficulty difficulty) async =>
       puzzle;
+}
+
+class _RecordingCompletedSudokuLogRepository
+    implements CompletedSudokuLogRepository {
+  final List<CompletedSudokuEntry> entries = <CompletedSudokuEntry>[];
+
+  @override
+  Future<void> addCompletedSudoku(CompletedSudokuEntry entry) async {
+    entries.add(entry);
+  }
+
+  @override
+  Future<List<CompletedSudokuEntry>> getCompletedSudokus() async => entries;
 }
