@@ -408,7 +408,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
     unawaited(_runFinishSequence());
   }
 
-  void _fillSudokuForAdminTestLeavingOneCellOpen() {
+  Future<void> _fillSudokuForAdminTestLeavingOneCellOpen() async {
     final SudokuGridData? gridData = _gridData;
     if (!_isAdminSolveButtonEnabled ||
         _isInteractionLocked ||
@@ -431,19 +431,50 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
       return;
     }
 
+    final List<_AdminReplayMove> adminMoves = <_AdminReplayMove>[];
+    for (int index = 0; index < 81; index++) {
+      final int row = index ~/ 9;
+      final int col = index % 9;
+      if (gridData.isFixed[row][col]) {
+        continue;
+      }
+      final int previousValue = gridData.currentGrid[row][col];
+      final int nextValue =
+          index == openCellIndex ? 0 : gridData.solutionGrid[row][col];
+      if (previousValue == nextValue) {
+        continue;
+      }
+      adminMoves.add(
+        _AdminReplayMove(
+          row: row,
+          col: col,
+          previousValue: previousValue,
+          nextValue: nextValue,
+        ),
+      );
+    }
+
+    if (adminMoves.isEmpty) {
+      return;
+    }
+
     setState(() {
-      for (int index = 0; index < 81; index++) {
-        final int row = index ~/ 9;
-        final int col = index % 9;
-        if (gridData.isFixed[row][col]) {
-          continue;
-        }
-        gridData.currentGrid[row][col] =
-            index == openCellIndex ? 0 : gridData.solutionGrid[row][col];
+      for (final _AdminReplayMove move in adminMoves) {
+        gridData.currentGrid[move.row][move.col] = move.nextValue;
       }
     });
 
     _scheduleChallengeAutosave();
+    final DateTime actionTime = DateTime.now();
+    for (final _AdminReplayMove move in adminMoves) {
+      await _replayLoggingController.logMove(
+        row: move.row,
+        col: move.col,
+        previousValue: move.previousValue,
+        nextValue: move.nextValue,
+        at: actionTime,
+      );
+    }
   }
 
   Future<void> _runFinishSequence() async {
@@ -902,6 +933,20 @@ class _LoadedPuzzleData {
   final SudokuGridData gridData;
   final DateTime startedAt;
   final ChallengeRoundData? challengeRoundData;
+}
+
+class _AdminReplayMove {
+  const _AdminReplayMove({
+    required this.row,
+    required this.col,
+    required this.previousValue,
+    required this.nextValue,
+  });
+
+  final int row;
+  final int col;
+  final int previousValue;
+  final int nextValue;
 }
 
 class _InMemorySudokuReplayRepository implements SudokuReplayRepository {

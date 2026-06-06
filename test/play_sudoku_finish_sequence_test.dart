@@ -5,6 +5,13 @@ import 'package:hello_world_app/features/sudoku/data/sudoku_puzzle_repository.da
 import 'package:hello_world_app/features/sudoku/domain/sudoku_difficulty.dart';
 import 'package:hello_world_app/features/sudoku/domain/sudoku_round_config.dart';
 import 'package:hello_world_app/features/sudoku/presentation/play_sudoku_page.dart';
+import 'package:hello_world_app/features/sudoku_replay/data/sudoku_replay_repository.dart';
+import 'package:hello_world_app/features/sudoku_replay/domain/sudoku_play_session.dart';
+import 'package:hello_world_app/features/sudoku_replay/domain/sudoku_replay.dart';
+import 'package:hello_world_app/features/sudoku_replay/domain/sudoku_replay_details.dart';
+import 'package:hello_world_app/features/sudoku_replay/domain/sudoku_replay_draft.dart';
+import 'package:hello_world_app/features/sudoku_replay/domain/sudoku_replay_move.dart';
+import 'package:hello_world_app/features/sudoku_replay/domain/sudoku_replay_round_key.dart';
 import 'package:hello_world_app/features/sudoku_history/data/completed_sudoku_log_repository.dart';
 import 'package:hello_world_app/features/sudoku_history/domain/completed_sudoku_entry.dart';
 
@@ -42,6 +49,8 @@ void main() {
       int replayCalls = 0;
       final _RecordingCompletedSudokuLogRepository historyRepository =
           _RecordingCompletedSudokuLogRepository();
+      final _RecordingSudokuReplayRepository replayRepository =
+          _RecordingSudokuReplayRepository();
       await tester.pumpWidget(
         MaterialApp(
           locale: const Locale('de'),
@@ -56,6 +65,7 @@ void main() {
                   '534678912672195348198342567859761423426853791713924856961537284287419635345286100',
             ),
             completedSudokuLogRepository: historyRepository,
+            replayRepository: replayRepository,
             adminTestOverrideEnabled: false,
             adminSolveButtonEnabled: true,
             onReplayRoundRequested: (
@@ -76,7 +86,7 @@ void main() {
       );
 
       await tester.tap(find.byKey(const Key('admin-solve-sudoku-button')));
-      await tester.pump();
+      await tester.pumpAndSettle();
 
       expect(
         find.descendant(
@@ -93,6 +103,15 @@ void main() {
         findsNothing,
       );
       expect(find.text('Sudoku geloest'), findsNothing);
+
+      final SudokuReplayDetails? replayDetails = await replayRepository
+          .getReplayDetails(replayRepository.replayId!);
+      expect(replayDetails, isNotNull);
+      expect(replayDetails!.moves, hasLength(1));
+      expect(replayDetails.moves.single.cellRow, 8);
+      expect(replayDetails.moves.single.cellCol, 7);
+      expect(replayDetails.moves.single.previousValue, 0);
+      expect(replayDetails.moves.single.nextValue, 7);
 
       await tester.tap(find.byKey(const Key('number-button-9')));
       await tester.pump();
@@ -212,4 +231,144 @@ class _RecordingCompletedSudokuLogRepository
 
   @override
   Future<List<CompletedSudokuEntry>> getCompletedSudokus() async => entries;
+}
+
+class _RecordingSudokuReplayRepository implements SudokuReplayRepository {
+  SudokuReplay? _replay;
+  final List<SudokuReplayMove> _moves = <SudokuReplayMove>[];
+  final List<SudokuPlaySession> _sessions = <SudokuPlaySession>[];
+
+  int? get replayId => _replay?.id;
+
+  @override
+  Future<void> addMove({
+    required int replayId,
+    required int sequence,
+    required int cellRow,
+    required int cellCol,
+    required int previousValue,
+    required int nextValue,
+    required int elapsedMillis,
+  }) async {
+    _moves.add(
+      SudokuReplayMove(
+        id: sequence + 1,
+        replayId: replayId,
+        sequence: sequence,
+        cellRow: cellRow,
+        cellCol: cellCol,
+        previousValue: previousValue,
+        nextValue: nextValue,
+        elapsedMillis: elapsedMillis,
+      ),
+    );
+  }
+
+  @override
+  Future<void> completeReplay({
+    required int replayId,
+    required String finalGridString,
+    required int playedDurationMillis,
+    required DateTime completedAt,
+  }) async {
+    final SudokuReplay? replay = _replay;
+    if (replay == null || replay.id != replayId) {
+      return;
+    }
+    _replay = SudokuReplay(
+      id: replay.id,
+      mode: replay.mode,
+      difficulty: replay.difficulty,
+      challengeDate: replay.challengeDate,
+      sourceSudokuId: replay.sourceSudokuId,
+      puzzleString: replay.puzzleString,
+      finalGridString: finalGridString,
+      playedDurationMillis: playedDurationMillis,
+      createdAt: replay.createdAt,
+      updatedAt: completedAt,
+      completedAt: completedAt,
+    );
+  }
+
+  @override
+  Future<SudokuReplay> createReplay(SudokuReplayDraft draft) async {
+    final SudokuReplay replay = SudokuReplay(
+      id: 1,
+      mode: draft.mode,
+      difficulty: draft.difficulty,
+      challengeDate: draft.challengeDate,
+      sourceSudokuId: draft.sourceSudokuId,
+      puzzleString: draft.puzzleString,
+      finalGridString: draft.puzzleString,
+      playedDurationMillis: 0,
+      createdAt: draft.createdAt,
+      updatedAt: draft.createdAt,
+    );
+    _replay = replay;
+    return replay;
+  }
+
+  @override
+  Future<void> endSession({
+    required int sessionId,
+    required DateTime endedAt,
+    required int activeDurationMillis,
+  }) async {
+    final int index = _sessions.indexWhere(
+      (SudokuPlaySession session) => session.id == sessionId,
+    );
+    if (index == -1) {
+      return;
+    }
+    final SudokuPlaySession session = _sessions[index];
+    _sessions[index] = SudokuPlaySession(
+      id: session.id,
+      replayId: session.replayId,
+      sessionIndex: session.sessionIndex,
+      startedAt: session.startedAt,
+      endedAt: endedAt,
+      activeDurationMillis: activeDurationMillis,
+    );
+  }
+
+  @override
+  Future<SudokuReplay?> findOpenReplay(SudokuReplayRoundKey key) async => null;
+
+  @override
+  Future<SudokuReplayDetails?> getReplayDetails(int replayId) async {
+    final SudokuReplay? replay = _replay;
+    if (replay == null || replay.id != replayId) {
+      return null;
+    }
+    return SudokuReplayDetails(
+      replay: replay,
+      moves:
+          _moves
+              .where((SudokuReplayMove move) => move.replayId == replayId)
+              .toList(),
+      sessions:
+          _sessions
+              .where((SudokuPlaySession session) => session.replayId == replayId)
+              .toList(),
+    );
+  }
+
+  @override
+  Future<int> startSession({
+    required int replayId,
+    required int sessionIndex,
+    required DateTime startedAt,
+  }) async {
+    final int sessionId = _sessions.length + 1;
+    _sessions.add(
+      SudokuPlaySession(
+        id: sessionId,
+        replayId: replayId,
+        sessionIndex: sessionIndex,
+        startedAt: startedAt,
+        activeDurationMillis: 0,
+      ),
+    );
+    return sessionId;
+  }
 }
