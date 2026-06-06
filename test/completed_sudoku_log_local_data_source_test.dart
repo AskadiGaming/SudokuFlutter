@@ -23,7 +23,8 @@ void main() {
             completed_at TEXT NOT NULL,
             duration_seconds INTEGER NOT NULL,
             challenge_date TEXT NULL,
-            source_sudoku_id INTEGER NULL
+            source_sudoku_id INTEGER NULL,
+            replay_id INTEGER NULL
           )
         ''');
       },
@@ -41,6 +42,7 @@ void main() {
         durationSeconds: 600,
         challengeDate: DateTime(2026, 6, 4),
         sourceSudokuId: 77,
+        replayId: 11,
       ),
     );
     await dataSource.addCompletedSudoku(
@@ -63,6 +65,7 @@ void main() {
     expect(entries.last.mode, CompletedSudokuMode.challenge);
     expect(entries.last.challengeDate, DateTime(2026, 6, 4));
     expect(entries.last.sourceSudokuId, 77);
+    expect(entries.last.replayId, 11);
 
     await db.close();
   });

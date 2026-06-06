@@ -46,6 +46,7 @@ class CompletedSudokuLogLocalDataSource {
       'duration_seconds': entry.durationSeconds,
       'challenge_date': _toIsoDate(entry.challengeDate),
       'source_sudoku_id': entry.sourceSudokuId,
+      'replay_id': entry.replayId,
     };
   }
 
@@ -63,6 +64,7 @@ class CompletedSudokuLogLocalDataSource {
       durationSeconds: row['duration_seconds']! as int,
       challengeDate: _parseIsoDate(row['challenge_date'] as String?),
       sourceSudokuId: row['source_sudoku_id'] as int?,
+      replayId: row['replay_id'] as int?,
     );
   }
 

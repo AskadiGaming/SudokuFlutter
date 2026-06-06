@@ -6,7 +6,7 @@ class AppDatabase {
 
   static final AppDatabase instance = AppDatabase._();
   static const String _databaseName = 'sudoku.db';
-  static const int _databaseVersion = 3;
+  static const int _databaseVersion = 5;
 
   Database? _database;
 
@@ -53,6 +53,7 @@ class AppDatabase {
     );
     await _createChallengeTables(db);
     await _createCompletedSudokuLogTable(db);
+    await _createSudokuReplayTables(db);
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -61,6 +62,14 @@ class AppDatabase {
     }
     if (oldVersion < 3) {
       await _createCompletedSudokuLogTable(db);
+    }
+    if (oldVersion < 4) {
+      await _ensureCompletedSudokuLogReplayColumn(db);
+      await _createSudokuReplayTables(db);
+    }
+    if (oldVersion < 5) {
+      await _ensureCompletedSudokuLogReplayColumn(db);
+      await _createSudokuReplayTables(db);
     }
   }
 
@@ -105,7 +114,7 @@ class AppDatabase {
 
   Future<void> _createCompletedSudokuLogTable(Database db) async {
     await db.execute('''
-      CREATE TABLE completed_sudoku_log (
+      CREATE TABLE IF NOT EXISTS completed_sudoku_log (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         difficulty TEXT NOT NULL CHECK(difficulty IN ('easy', 'medium', 'hard', 'extreme')),
         mode TEXT NOT NULL CHECK(mode IN ('normal', 'daily', 'challenge')),
@@ -113,11 +122,81 @@ class AppDatabase {
         completed_at TEXT NOT NULL,
         duration_seconds INTEGER NOT NULL,
         challenge_date TEXT NULL,
-        source_sudoku_id INTEGER NULL
+        source_sudoku_id INTEGER NULL,
+        replay_id INTEGER NULL
       )
     ''');
     await db.execute(
-      'CREATE INDEX idx_completed_sudoku_log_completed_at ON completed_sudoku_log(completed_at DESC)',
+      'CREATE INDEX IF NOT EXISTS idx_completed_sudoku_log_completed_at ON completed_sudoku_log(completed_at DESC)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_completed_sudoku_log_replay_id ON completed_sudoku_log(replay_id)',
+    );
+  }
+
+  Future<void> _createSudokuReplayTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS sudoku_replay (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        mode TEXT NOT NULL CHECK(mode IN ('normal', 'daily', 'challenge')),
+        difficulty TEXT NOT NULL CHECK(difficulty IN ('easy', 'medium', 'hard', 'extreme')),
+        challenge_date TEXT NULL,
+        source_sudoku_id INTEGER NULL,
+        puzzle_string TEXT NOT NULL,
+        final_grid_string TEXT NOT NULL,
+        played_duration_millis INTEGER NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        completed_at TEXT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS sudoku_replay_move (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        replay_id INTEGER NOT NULL,
+        sequence INTEGER NOT NULL,
+        cell_row INTEGER NOT NULL,
+        cell_col INTEGER NOT NULL,
+        previous_value INTEGER NOT NULL,
+        next_value INTEGER NOT NULL,
+        elapsed_millis INTEGER NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS sudoku_play_session (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        replay_id INTEGER NOT NULL,
+        session_index INTEGER NOT NULL,
+        started_at TEXT NOT NULL,
+        ended_at TEXT NULL,
+        active_duration_millis INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_sudoku_replay_mode_created_at ON sudoku_replay(mode, created_at DESC)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_sudoku_replay_move_replay_sequence ON sudoku_replay_move(replay_id, sequence)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_sudoku_play_session_replay_session_index ON sudoku_play_session(replay_id, session_index)',
+    );
+  }
+
+  Future<void> _ensureCompletedSudokuLogReplayColumn(Database db) async {
+    final List<Map<String, Object?>> columns = await db.rawQuery(
+      "PRAGMA table_info('completed_sudoku_log')",
+    );
+    final bool hasReplayId = columns.any(
+      (Map<String, Object?> column) => column['name'] == 'replay_id',
+    );
+    if (!hasReplayId) {
+      await db.execute(
+        'ALTER TABLE completed_sudoku_log ADD COLUMN replay_id INTEGER NULL',
+      );
+    }
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_completed_sudoku_log_replay_id ON completed_sudoku_log(replay_id)',
     );
   }
 }

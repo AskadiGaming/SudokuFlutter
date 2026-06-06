@@ -3,6 +3,7 @@ import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:intl/intl.dart';
 
 import '../../sudoku/domain/sudoku_difficulty.dart';
+import '../../sudoku_replay/presentation/completed_sudoku_replay_page.dart';
 import '../application/completed_sudoku_log_controller.dart';
 import '../data/completed_sudoku_log_repository.dart';
 import '../data/local_completed_sudoku_log_repository.dart';
@@ -66,7 +67,21 @@ class _CompletedSudokuLogPageState extends State<CompletedSudokuLogPage> {
             separatorBuilder: (_, _) => const SizedBox(height: 12),
             itemBuilder: (BuildContext context, int index) {
               final CompletedSudokuEntry entry = _controller.entries[index];
-              return _CompletedSudokuEntryCard(entry: entry);
+              return _CompletedSudokuEntryCard(
+                entry: entry,
+                onTap:
+                    entry.replayId == null
+                        ? null
+                        : () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder:
+                                (BuildContext context) =>
+                                    CompletedSudokuReplayPage(
+                                      replayId: entry.replayId!,
+                                    ),
+                          ),
+                        ),
+              );
             },
           );
         },
@@ -76,9 +91,10 @@ class _CompletedSudokuLogPageState extends State<CompletedSudokuLogPage> {
 }
 
 class _CompletedSudokuEntryCard extends StatelessWidget {
-  const _CompletedSudokuEntryCard({required this.entry});
+  const _CompletedSudokuEntryCard({required this.entry, this.onTap});
 
   final CompletedSudokuEntry entry;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -86,24 +102,33 @@ class _CompletedSudokuEntryCard extends StatelessWidget {
     final DateFormat timestampFormat = DateFormat('dd.MM.yyyy HH:mm');
 
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              _difficultyLabel(l10n, entry.difficulty),
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '${l10n.completedSudokusCompletedAtLabel}: ${timestampFormat.format(entry.completedAt)}',
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '${l10n.completedSudokusDurationLabel}: ${_formatDuration(entry.durationSeconds)}',
-            ),
-          ],
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                _difficultyLabel(l10n, entry.difficulty),
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${l10n.completedSudokusCompletedAtLabel}: ${timestampFormat.format(entry.completedAt)}',
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${l10n.completedSudokusDurationLabel}: ${_formatDuration(entry.durationSeconds)}',
+              ),
+              const SizedBox(height: 8),
+              Text(
+                entry.replayId == null
+                    ? 'Kein Replay verfuegbar'
+                    : 'Replay ansehen',
+              ),
+            ],
+          ),
         ),
       ),
     );

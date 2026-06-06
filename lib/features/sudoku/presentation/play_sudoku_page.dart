@@ -12,11 +12,22 @@ import '../../sudoku_history/data/completed_sudoku_log_repository.dart';
 import '../../sudoku_history/data/local_completed_sudoku_log_repository.dart';
 import '../../sudoku_history/domain/completed_sudoku_entry.dart';
 import '../../sudoku_history/domain/completed_sudoku_mode.dart';
+import '../../sudoku_replay/application/sudoku_replay_logging_controller.dart';
+import '../../sudoku_replay/data/local_sudoku_replay_repository.dart';
+import '../../sudoku_replay/data/sudoku_replay_repository.dart';
+import '../../sudoku_replay/domain/sudoku_play_session.dart';
+import '../../sudoku_replay/domain/sudoku_replay.dart';
+import '../../sudoku_replay/domain/sudoku_replay_draft.dart';
+import '../../sudoku_replay/domain/sudoku_replay_details.dart';
+import '../../sudoku_replay/domain/sudoku_replay_move.dart';
+import '../../sudoku_replay/domain/sudoku_replay_round_key.dart';
 import '../data/local_sudoku_puzzle_repository.dart';
 import '../data/sudoku_puzzle_repository.dart';
+import '../dev/admin_sudoku_flags.dart';
 import '../dev/admin_test_sudoku_override.dart';
 import '../domain/admin_test_sudoku_config.dart';
 import '../domain/default_sudoku_modifier_config.dart';
+import '../domain/sudoku_difficulty.dart';
 import '../domain/sudoku_finish_logic.dart';
 import '../domain/sudoku_grid_parser.dart';
 import '../domain/sudoku_modifier_config.dart';
@@ -41,8 +52,10 @@ class PlaySudokuPage extends StatefulWidget {
     this.repository,
     this.challengeRepository,
     this.completedSudokuLogRepository,
+    this.replayRepository,
     this.adminTestOverrideConfig,
     this.adminTestOverrideEnabled,
+    this.adminSolveButtonEnabled,
     this.random,
     super.key,
   });
@@ -56,8 +69,10 @@ class PlaySudokuPage extends StatefulWidget {
   final SudokuPuzzleRepository? repository;
   final ChallengeRepository? challengeRepository;
   final CompletedSudokuLogRepository? completedSudokuLogRepository;
+  final SudokuReplayRepository? replayRepository;
   final AdminTestSudokuConfig? adminTestOverrideConfig;
   final bool? adminTestOverrideEnabled;
+  final bool? adminSolveButtonEnabled;
   final Random? random;
 
   @override
@@ -65,7 +80,7 @@ class PlaySudokuPage extends StatefulWidget {
 }
 
 class _PlaySudokuPageState extends State<PlaySudokuPage>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   static const String _goatAssetPath = 'assets/images/modifiers/goat.png';
   static const Duration _finishStepDelay = Duration(milliseconds: 45);
   static final List<int> _spiralOrder = buildSpiralOrder9x9();
@@ -77,6 +92,13 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
   late final CompletedSudokuLogRepository _completedSudokuLogRepository =
       widget.completedSudokuLogRepository ??
       LocalCompletedSudokuLogRepository();
+  late final SudokuReplayRepository _replayRepository =
+      widget.replayRepository ??
+      (_isRunningUnderTest
+          ? _InMemorySudokuReplayRepository()
+          : LocalSudokuReplayRepository());
+  late final SudokuReplayLoggingController _replayLoggingController =
+      SudokuReplayLoggingController(repository: _replayRepository);
   late final Random _random = widget.random ?? Random();
 
   late final AnimationController _rotationController;
@@ -115,10 +137,12 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
   Timer? _challengeAutosaveTimer;
   DateTime? _roundStartedAt;
   bool _completedSudokuLogged = false;
+  bool _isReplayReady = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _rotationController = AnimationController(vsync: this);
     _rotation90Controller = AnimationController(vsync: this);
     _textRotationController = AnimationController(vsync: this);
@@ -191,9 +215,17 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
         _isReplayStarting = false;
         _completedSudokuLogged =
             loaded.challengeRoundData?.isCompleted ?? false;
+        _isReplayReady = false;
         _hiddenCellIndices.clear();
         _rainDrops.clear();
         _lastRainUpdate = null;
+      });
+      await _initializeReplayLogging(loaded);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isReplayReady = true;
       });
       _startModifierLifecycleIfNeeded();
       if (!(loaded.challengeRoundData?.isCompleted ?? false)) {
@@ -316,6 +348,11 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
       return;
     }
 
+    final int previousValue = gridData.currentGrid[row][col];
+    if (previousValue == _activeValue) {
+      return;
+    }
+
     setState(() {
       gridData.currentGrid[row][col] = _activeValue;
       if (_activeModifier == SudokuModifierType.textRotation &&
@@ -327,6 +364,16 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
         );
       }
     });
+    final DateTime moveTime = DateTime.now();
+    unawaited(
+      _replayLoggingController.logMove(
+        row: row,
+        col: col,
+        previousValue: previousValue,
+        nextValue: _activeValue,
+        at: moveTime,
+      ),
+    );
     _scheduleChallengeAutosave();
     _checkSolvedAndMaybeStartFinishSequence();
   }
@@ -342,6 +389,14 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
   bool get _isInteractionLocked =>
       _isFinishSequenceRunning || _showSolvedOverlay || _isReplayStarting;
 
+  bool get _isAdminSolveButtonEnabled {
+    final bool? overrideEnabled = widget.adminSolveButtonEnabled;
+    if (overrideEnabled != null) {
+      return overrideEnabled;
+    }
+    return ADMIN_BUTTON_SUDOKU_SOLVE;
+  }
+
   void _checkSolvedAndMaybeStartFinishSequence() {
     final SudokuGridData? gridData = _gridData;
     if (gridData == null || _isSolved || _isFinishSequenceRunning) {
@@ -353,12 +408,54 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
     unawaited(_runFinishSequence());
   }
 
+  void _fillSudokuForAdminTestLeavingOneCellOpen() {
+    final SudokuGridData? gridData = _gridData;
+    if (!_isAdminSolveButtonEnabled ||
+        _isInteractionLocked ||
+        _isSolved ||
+        gridData == null) {
+      return;
+    }
+
+    int? openCellIndex;
+    for (int index = 80; index >= 0; index--) {
+      final int row = index ~/ 9;
+      final int col = index % 9;
+      if (!gridData.isFixed[row][col]) {
+        openCellIndex = index;
+        break;
+      }
+    }
+
+    if (openCellIndex == null) {
+      return;
+    }
+
+    setState(() {
+      for (int index = 0; index < 81; index++) {
+        final int row = index ~/ 9;
+        final int col = index % 9;
+        if (gridData.isFixed[row][col]) {
+          continue;
+        }
+        gridData.currentGrid[row][col] =
+            index == openCellIndex ? 0 : gridData.solutionGrid[row][col];
+      }
+    });
+
+    _scheduleChallengeAutosave();
+  }
+
   Future<void> _runFinishSequence() async {
     if (_isFinishSequenceRunning || _showSolvedOverlay) {
       return;
     }
 
     final DateTime completedAt = DateTime.now();
+    await _replayLoggingController.complete(
+      finalGridString: _gridToString(_gridData!.currentGrid),
+      completedAt: completedAt,
+    );
     await _flushChallengeAutosave(
       markCompleted: true,
       completedAt: completedAt,
@@ -436,8 +533,10 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
                 challengeRepository: widget.challengeRepository,
                 completedSudokuLogRepository:
                     widget.completedSudokuLogRepository,
+                replayRepository: widget.replayRepository,
                 adminTestOverrideConfig: widget.adminTestOverrideConfig,
                 adminTestOverrideEnabled: widget.adminTestOverrideEnabled,
+                adminSolveButtonEnabled: widget.adminSolveButtonEnabled,
                 random: widget.random,
               ),
         ),
@@ -454,17 +553,37 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
   @override
   void dispose() {
     _isDisposing = true;
+    WidgetsBinding.instance.removeObserver(this);
     if (_challengeAutosaveTimer != null) {
       _challengeAutosaveTimer!.cancel();
       _challengeAutosaveTimer = null;
       unawaited(_flushChallengeAutosave());
     }
+    unawaited(_replayLoggingController.pauseSession(DateTime.now()));
+    unawaited(_replayLoggingController.flush());
     _modifierScheduler.dispose();
     _rotationController.dispose();
     _rotation90Controller.dispose();
     _textRotationController.dispose();
     _splitController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!_isReplayReady || _isSolved) {
+      return;
+    }
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached ||
+        state == AppLifecycleState.hidden) {
+      unawaited(_replayLoggingController.pauseSession(DateTime.now()));
+      return;
+    }
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_replayLoggingController.startSession(DateTime.now()));
+    }
   }
 
   @override
@@ -560,6 +679,20 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
           ),
         ),
         const SizedBox(height: 16),
+        if (_isAdminSolveButtonEnabled) ...<Widget>[
+          Align(
+            alignment: Alignment.centerRight,
+            child: OutlinedButton(
+              key: const Key('admin-solve-sudoku-button'),
+              onPressed:
+                  (_gridData == null || _isInteractionLocked || _isSolved)
+                      ? null
+                      : _fillSudokuForAdminTestLeavingOneCellOpen,
+              child: const Text('Admin: fast loesen'),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
         SudokuNumberPad(
           activeValue: _activeValue,
           enabled: !_isInteractionLocked,
@@ -693,10 +826,9 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
 
     final DateTime startedAt = _roundStartedAt ?? completedAt;
     final ChallengeRoundData? challengeRoundData = _activeChallengeRound;
-    final int durationSeconds = completedAt
-        .difference(startedAt)
-        .inSeconds
-        .clamp(0, 1 << 31);
+    final int durationSeconds =
+        (_replayLoggingController.currentElapsedMillis(completedAt) ~/ 1000)
+            .clamp(0, 1 << 31);
 
     await _completedSudokuLogRepository.addCompletedSudoku(
       CompletedSudokuEntry(
@@ -707,9 +839,35 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
         durationSeconds: durationSeconds,
         challengeDate: challengeRoundData?.date,
         sourceSudokuId: challengeRoundData?.sudokuId,
+        replayId: _replayLoggingController.replayId,
       ),
     );
     _completedSudokuLogged = true;
+  }
+
+  Future<void> _initializeReplayLogging(_LoadedPuzzleData loaded) async {
+    final CompletedSudokuMode mode = _mapCompletedMode(widget.roundConfig.mode);
+    final ChallengeRoundData? roundData = loaded.challengeRoundData;
+    await _replayLoggingController.initialize(
+      draft: SudokuReplayDraft(
+        mode: mode,
+        difficulty: widget.roundConfig.difficulty,
+        challengeDate: roundData?.date,
+        sourceSudokuId: roundData?.sudokuId,
+        puzzleString: _gridToString(loaded.gridData.initialGrid),
+        createdAt: loaded.startedAt,
+      ),
+      allowResume: widget.roundConfig.mode == SudokuRoundMode.challenge,
+      roundKey: SudokuReplayRoundKey(
+        mode: mode,
+        difficulty: widget.roundConfig.difficulty,
+        challengeDate: roundData?.date,
+        sourceSudokuId: roundData?.sudokuId,
+      ),
+    );
+    if (!(loaded.challengeRoundData?.isCompleted ?? false)) {
+      await _replayLoggingController.startSession(DateTime.now());
+    }
   }
 
   CompletedSudokuMode _mapCompletedMode(SudokuRoundMode mode) {
@@ -744,4 +902,314 @@ class _LoadedPuzzleData {
   final SudokuGridData gridData;
   final DateTime startedAt;
   final ChallengeRoundData? challengeRoundData;
+}
+
+class _InMemorySudokuReplayRepository implements SudokuReplayRepository {
+  SudokuReplayRoundKey? _openReplayKey;
+  _InMemorySudokuReplay? _replay;
+  final List<_InMemoryReplayMove> _moves = <_InMemoryReplayMove>[];
+  final List<_InMemoryReplaySession> _sessions = <_InMemoryReplaySession>[];
+
+  @override
+  Future<void> addMove({
+    required int replayId,
+    required int sequence,
+    required int cellRow,
+    required int cellCol,
+    required int previousValue,
+    required int nextValue,
+    required int elapsedMillis,
+  }) async {
+    _moves.add(
+      _InMemoryReplayMove(
+        replayId: replayId,
+        sequence: sequence,
+        cellRow: cellRow,
+        cellCol: cellCol,
+        previousValue: previousValue,
+        nextValue: nextValue,
+        elapsedMillis: elapsedMillis,
+      ),
+    );
+  }
+
+  @override
+  Future<void> completeReplay({
+    required int replayId,
+    required String finalGridString,
+    required int playedDurationMillis,
+    required DateTime completedAt,
+  }) async {
+    final _InMemorySudokuReplay? replay = _replay;
+    if (replay == null || replay.id != replayId) {
+      return;
+    }
+    _replay = replay.copyWith(
+      finalGridString: finalGridString,
+      playedDurationMillis: playedDurationMillis,
+      updatedAt: completedAt,
+      completedAt: completedAt,
+    );
+  }
+
+  @override
+  Future<SudokuReplay> createReplay(SudokuReplayDraft draft) async {
+    final SudokuReplay replay = SudokuReplay(
+      id: 1,
+      mode: draft.mode,
+      difficulty: draft.difficulty,
+      challengeDate: draft.challengeDate,
+      sourceSudokuId: draft.sourceSudokuId,
+      puzzleString: draft.puzzleString,
+      finalGridString: draft.puzzleString,
+      playedDurationMillis: 0,
+      createdAt: draft.createdAt,
+      updatedAt: draft.createdAt,
+    );
+    _replay = _InMemorySudokuReplay.fromBase(replay);
+    _openReplayKey = SudokuReplayRoundKey(
+      mode: draft.mode,
+      difficulty: draft.difficulty,
+      challengeDate: draft.challengeDate,
+      sourceSudokuId: draft.sourceSudokuId,
+    );
+    return replay;
+  }
+
+  @override
+  Future<void> endSession({
+    required int sessionId,
+    required DateTime endedAt,
+    required int activeDurationMillis,
+  }) async {
+    final int index = _sessions.indexWhere(
+      (_InMemoryReplaySession session) => session.id == sessionId,
+    );
+    if (index == -1) {
+      return;
+    }
+    _sessions[index] = _sessions[index].copyWith(
+      endedAt: endedAt,
+      activeDurationMillis: activeDurationMillis,
+    );
+  }
+
+  @override
+  Future<SudokuReplay?> findOpenReplay(SudokuReplayRoundKey key) async {
+    final _InMemorySudokuReplay? replay = _replay;
+    if (replay == null || replay.completedAt != null || !_matches(key)) {
+      return null;
+    }
+    return replay.toBase();
+  }
+
+  @override
+  Future<SudokuReplayDetails?> getReplayDetails(int replayId) async {
+    final _InMemorySudokuReplay? replay = _replay;
+    if (replay == null || replay.id != replayId) {
+      return null;
+    }
+    return SudokuReplayDetails(
+      replay: replay.toBase(),
+      moves:
+          _moves
+              .where((_InMemoryReplayMove move) => move.replayId == replayId)
+              .map((_InMemoryReplayMove move) => move.toBase())
+              .toList(),
+      sessions:
+          _sessions
+              .where(
+                (_InMemoryReplaySession session) =>
+                    session.replayId == replayId,
+              )
+              .map((_InMemoryReplaySession session) => session.toBase())
+              .toList(),
+    );
+  }
+
+  @override
+  Future<int> startSession({
+    required int replayId,
+    required int sessionIndex,
+    required DateTime startedAt,
+  }) async {
+    final int id = _sessions.length + 1;
+    _sessions.add(
+      _InMemoryReplaySession(
+        id: id,
+        replayId: replayId,
+        sessionIndex: sessionIndex,
+        startedAt: startedAt,
+      ),
+    );
+    return id;
+  }
+
+  bool _matches(SudokuReplayRoundKey key) {
+    final SudokuReplayRoundKey? openReplayKey = _openReplayKey;
+    if (openReplayKey == null) {
+      return false;
+    }
+    return openReplayKey.mode == key.mode &&
+        openReplayKey.difficulty == key.difficulty &&
+        openReplayKey.challengeDate == key.challengeDate &&
+        openReplayKey.sourceSudokuId == key.sourceSudokuId;
+  }
+}
+
+class _InMemorySudokuReplay {
+  const _InMemorySudokuReplay({
+    required this.id,
+    required this.mode,
+    required this.difficulty,
+    required this.puzzleString,
+    required this.finalGridString,
+    required this.playedDurationMillis,
+    required this.createdAt,
+    required this.updatedAt,
+    this.challengeDate,
+    this.sourceSudokuId,
+    this.completedAt,
+  });
+
+  factory _InMemorySudokuReplay.fromBase(SudokuReplay replay) {
+    return _InMemorySudokuReplay(
+      id: replay.id,
+      mode: replay.mode,
+      difficulty: replay.difficulty,
+      challengeDate: replay.challengeDate,
+      sourceSudokuId: replay.sourceSudokuId,
+      puzzleString: replay.puzzleString,
+      finalGridString: replay.finalGridString,
+      playedDurationMillis: replay.playedDurationMillis,
+      createdAt: replay.createdAt,
+      updatedAt: replay.updatedAt,
+      completedAt: replay.completedAt,
+    );
+  }
+
+  final int id;
+  final CompletedSudokuMode mode;
+  final SudokuDifficulty difficulty;
+  final DateTime? challengeDate;
+  final int? sourceSudokuId;
+  final String puzzleString;
+  final String finalGridString;
+  final int playedDurationMillis;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? completedAt;
+
+  _InMemorySudokuReplay copyWith({
+    String? finalGridString,
+    int? playedDurationMillis,
+    DateTime? updatedAt,
+    DateTime? completedAt,
+  }) {
+    return _InMemorySudokuReplay(
+      id: id,
+      mode: mode,
+      difficulty: difficulty,
+      challengeDate: challengeDate,
+      sourceSudokuId: sourceSudokuId,
+      puzzleString: puzzleString,
+      finalGridString: finalGridString ?? this.finalGridString,
+      playedDurationMillis: playedDurationMillis ?? this.playedDurationMillis,
+      createdAt: createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      completedAt: completedAt ?? this.completedAt,
+    );
+  }
+
+  SudokuReplay toBase() {
+    return SudokuReplay(
+      id: id,
+      mode: mode,
+      difficulty: difficulty,
+      challengeDate: challengeDate,
+      sourceSudokuId: sourceSudokuId,
+      puzzleString: puzzleString,
+      finalGridString: finalGridString,
+      playedDurationMillis: playedDurationMillis,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+      completedAt: completedAt,
+    );
+  }
+}
+
+class _InMemoryReplayMove {
+  const _InMemoryReplayMove({
+    required this.replayId,
+    required this.sequence,
+    required this.cellRow,
+    required this.cellCol,
+    required this.previousValue,
+    required this.nextValue,
+    required this.elapsedMillis,
+  });
+
+  final int replayId;
+  final int sequence;
+  final int cellRow;
+  final int cellCol;
+  final int previousValue;
+  final int nextValue;
+  final int elapsedMillis;
+
+  SudokuReplayMove toBase() {
+    return SudokuReplayMove(
+      id: sequence + 1,
+      replayId: replayId,
+      sequence: sequence,
+      cellRow: cellRow,
+      cellCol: cellCol,
+      previousValue: previousValue,
+      nextValue: nextValue,
+      elapsedMillis: elapsedMillis,
+    );
+  }
+}
+
+class _InMemoryReplaySession {
+  const _InMemoryReplaySession({
+    required this.id,
+    required this.replayId,
+    required this.sessionIndex,
+    required this.startedAt,
+    this.endedAt,
+    this.activeDurationMillis = 0,
+  });
+
+  final int id;
+  final int replayId;
+  final int sessionIndex;
+  final DateTime startedAt;
+  final DateTime? endedAt;
+  final int activeDurationMillis;
+
+  _InMemoryReplaySession copyWith({
+    DateTime? endedAt,
+    int? activeDurationMillis,
+  }) {
+    return _InMemoryReplaySession(
+      id: id,
+      replayId: replayId,
+      sessionIndex: sessionIndex,
+      startedAt: startedAt,
+      endedAt: endedAt ?? this.endedAt,
+      activeDurationMillis: activeDurationMillis ?? this.activeDurationMillis,
+    );
+  }
+
+  SudokuPlaySession toBase() {
+    return SudokuPlaySession(
+      id: id,
+      replayId: replayId,
+      sessionIndex: sessionIndex,
+      startedAt: startedAt,
+      endedAt: endedAt,
+      activeDurationMillis: activeDurationMillis,
+    );
+  }
 }

@@ -11,6 +11,7 @@ class CompletedSudokuEntry {
     required this.durationSeconds,
     this.challengeDate,
     this.sourceSudokuId,
+    this.replayId,
   });
 
   final int? id;
@@ -21,4 +22,5 @@ class CompletedSudokuEntry {
   final int durationSeconds;
   final DateTime? challengeDate;
   final int? sourceSudokuId;
+  final int? replayId;
 }
