@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hello_world_app/features/challenge/data/challenge_repository.dart';
 import 'package:hello_world_app/features/challenge/domain/challenge_month_data.dart';
@@ -25,6 +26,9 @@ void main() {
   ) async {
     await tester.pumpWidget(
       MaterialApp(
+        locale: const Locale('de'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         home: PlaySudokuPage(
           roundConfig: const SudokuRoundConfig(
             difficulty: SudokuDifficulty.easy,
@@ -39,7 +43,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('sudoku-round-timer')), findsOneWidget);
+    expect(find.byKey(const Key('sudoku-round-difficulty')), findsOneWidget);
     expect(find.text('00:00'), findsOneWidget);
+    expect(find.text('Leicht'), findsOneWidget);
 
     await tester.runAsync(() async {
       await Future<void>.delayed(const Duration(milliseconds: 1100));
@@ -55,6 +61,8 @@ void main() {
     final DateTime challengeDate = DateTime(2026, 6, 11);
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         home: PlaySudokuPage(
           roundConfig: SudokuRoundConfig(
             difficulty: SudokuDifficulty.easy,

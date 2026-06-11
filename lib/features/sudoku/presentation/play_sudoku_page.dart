@@ -918,6 +918,15 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
                       elapsed: _visibleElapsed,
                     ),
                   ),
+                if (_shouldShowRoundTimer)
+                  Positioned(
+                    top: 16,
+                    right: 16,
+                    child: SudokuCornerInfoText(
+                      key: const Key('sudoku-round-difficulty'),
+                      text: _difficultyLabel(context),
+                    ),
+                  ),
                 if (showRainOverlay)
                   Positioned.fill(
                     child: RainOverlay(
@@ -1063,6 +1072,20 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
     return Duration(
       milliseconds: _replayLoggingController.currentElapsedMillis(now),
     );
+  }
+
+  String _difficultyLabel(BuildContext context) {
+    final AppLocalizations? l10n = AppLocalizations.of(context);
+    switch (widget.roundConfig.difficulty) {
+      case SudokuDifficulty.easy:
+        return l10n?.quickmatchDifficultyEasy ?? 'Easy';
+      case SudokuDifficulty.medium:
+        return l10n?.quickmatchDifficultyMedium ?? 'Medium';
+      case SudokuDifficulty.hard:
+        return l10n?.quickmatchDifficultyHard ?? 'Hard';
+      case SudokuDifficulty.extreme:
+        return l10n?.quickmatchDifficultyExtreme ?? 'Extreme';
+    }
   }
 
   void _startRoundClockIfNeeded() {

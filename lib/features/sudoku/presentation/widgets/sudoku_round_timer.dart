@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-class SudokuRoundTimer extends StatelessWidget {
-  const SudokuRoundTimer({required this.elapsed, super.key});
+class SudokuCornerInfoText extends StatelessWidget {
+  const SudokuCornerInfoText({required this.text, super.key});
 
-  final Duration elapsed;
+  final String text;
 
   @override
   Widget build(BuildContext context) {
@@ -12,7 +12,7 @@ class SudokuRoundTimer extends StatelessWidget {
 
     return IgnorePointer(
       child: Text(
-        _formatElapsed(elapsed),
+        text,
         style: theme.textTheme.titleSmall?.copyWith(
           fontSize: baseFontSize * 0.5,
           fontWeight: FontWeight.w500,
@@ -20,6 +20,17 @@ class SudokuRoundTimer extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class SudokuRoundTimer extends StatelessWidget {
+  const SudokuRoundTimer({required this.elapsed, super.key});
+
+  final Duration elapsed;
+
+  @override
+  Widget build(BuildContext context) {
+    return SudokuCornerInfoText(text: _formatElapsed(elapsed));
   }
 
   String _formatElapsed(Duration duration) {
