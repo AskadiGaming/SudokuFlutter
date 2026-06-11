@@ -183,10 +183,10 @@ void main() {
     );
     expect(tester.widget<AnimatedOpacity>(firstCellOpacity).opacity, 0);
 
-    final InkWell numberPadButton = tester.widget<InkWell>(
-      find.byKey(const Key('number-button-delete')),
+    final InkWell deleteActionButton = tester.widget<InkWell>(
+      find.byKey(const Key('sudoku-action-delete-button')),
     );
-    expect(numberPadButton.onTap, isNull);
+    expect(deleteActionButton.onTap, isNull);
 
     await tester.pump(const Duration(seconds: 5));
 

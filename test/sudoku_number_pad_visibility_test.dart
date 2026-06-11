@@ -17,7 +17,17 @@ void main() {
             width: 400,
             child: SudokuNumberPad(
               activeValue: 1,
-              hiddenValues: const <int>{3},
+              remainingCounts: const <int, int>{
+                1: 8,
+                2: 4,
+                3: 0,
+                4: 6,
+                5: 1,
+                6: 5,
+                7: 2,
+                8: 4,
+                9: 6,
+              },
               onValueSelected: (_) {},
             ),
           ),
@@ -26,8 +36,8 @@ void main() {
     );
 
     expect(find.byKey(const Key('number-button-3')), findsNothing);
-    expect(find.byKey(const Key('number-button-gap-3')), findsOneWidget);
     expect(find.byKey(const Key('number-button-slot-3')), findsOneWidget);
+    expect(find.byKey(const Key('number-button-gap-3')), findsOneWidget);
 
     final double slot2X =
         tester.getTopLeft(find.byKey(const Key('number-button-slot-2'))).dx;
@@ -59,6 +69,8 @@ void main() {
 
     expect(find.byKey(const Key('number-button-1')), findsOneWidget);
     expect(find.byKey(const Key('number-button-1-selected')), findsOneWidget);
+    expect(find.byKey(const Key('number-button-count-1')), findsOneWidget);
+    expect(find.text('1'), findsWidgets);
 
     await tester.tap(find.byKey(const Key('sudoku-cell-0-0')));
     await tester.pumpAndSettle();
@@ -67,13 +79,14 @@ void main() {
     expect(find.byKey(const Key('number-button-gap-1')), findsOneWidget);
     expect(find.byKey(const Key('number-button-2-selected')), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('number-button-delete')));
+    await tester.tap(find.byKey(const Key('sudoku-action-delete-button')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('sudoku-cell-0-0')));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('number-button-1')), findsOneWidget);
     expect(find.byKey(const Key('number-button-gap-1')), findsNothing);
+    expect(find.text('1'), findsWidgets);
   });
 }
 

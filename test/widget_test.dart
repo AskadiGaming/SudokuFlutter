@@ -28,7 +28,7 @@ void main() {
     expect(find.byKey(const Key('number-button-1-selected')), findsOneWidget);
     expect(find.byKey(const Key('number-button-3-selected')), findsNothing);
     expect(
-      find.byKey(const Key('number-button-delete-selected')),
+      find.byKey(const Key('sudoku-action-delete-selected')),
       findsNothing,
     );
 
@@ -38,12 +38,12 @@ void main() {
     expect(find.byKey(const Key('number-button-1-selected')), findsNothing);
     expect(find.byKey(const Key('number-button-3-selected')), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('number-button-delete')));
+    await tester.tap(find.byKey(const Key('sudoku-action-delete-button')));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('number-button-3-selected')), findsNothing);
     expect(
-      find.byKey(const Key('number-button-delete-selected')),
+      find.byKey(const Key('sudoku-action-delete-selected')),
       findsOneWidget,
     );
   });
@@ -110,7 +110,7 @@ void main() {
     },
   );
 
-  testWidgets('delete button clears editable cell but not fixed cell', (
+  testWidgets('delete action clears editable cell but not fixed cell', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
@@ -138,7 +138,7 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.tap(find.byKey(const Key('number-button-delete')));
+    await tester.tap(find.byKey(const Key('sudoku-action-delete-button')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('sudoku-cell-0-1')));
     await tester.pumpAndSettle();
@@ -160,6 +160,46 @@ void main() {
         matching: find.text('5'),
       ),
       findsOneWidget,
+    );
+  });
+
+  testWidgets('undo action reverts the last grid change', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PlaySudokuPage(
+          roundConfig: const SudokuRoundConfig(
+            difficulty: SudokuDifficulty.easy,
+          ),
+          repository: _FakeRepository(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('number-button-3')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('sudoku-cell-0-1')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('sudoku-cell-0-1')),
+        matching: find.text('3'),
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const Key('sudoku-action-undo-button')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('sudoku-cell-0-1')),
+        matching: find.text('3'),
+      ),
+      findsNothing,
     );
   });
 

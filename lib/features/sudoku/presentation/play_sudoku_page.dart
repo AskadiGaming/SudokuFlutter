@@ -48,6 +48,7 @@ import 'modifiers/models/rain_drop.dart';
 import 'modifiers/widgets/rain_overlay.dart';
 import 'widgets/modifier_banner.dart';
 import 'widgets/number_pad.dart';
+import 'widgets/sudoku_action_bar.dart';
 import 'widgets/sudoku_round_timer.dart';
 import 'widgets/sudoku_grid.dart';
 
@@ -150,7 +151,6 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
   bool _showSolvedOverlay = false;
   bool _isReplayStarting = false;
   bool _isHintRequestInProgress = false;
-  bool _isHintHighlightRunning = false;
   int? _hintHighlightCellIndex;
   final Set<int> _hiddenCellIndices = <int>{};
   ChallengeRoundData? _activeChallengeRound;
@@ -160,6 +160,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
   bool _completedSudokuLogged = false;
   bool _isReplayReady = false;
   Duration _visibleElapsed = Duration.zero;
+  final List<_UndoActionGroup> _undoHistory = <_UndoActionGroup>[];
 
   @override
   void initState() {
@@ -242,6 +243,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
         _completedSudokuLogged =
             loaded.challengeRoundData?.isCompleted ?? false;
         _isReplayReady = false;
+        _undoHistory.clear();
         _hiddenCellIndices.clear();
         _rainDrops.clear();
         _lastRainUpdate = null;
@@ -388,6 +390,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
     if (writeResult == null) {
       return;
     }
+    _recordUndoGroup(<_GridWriteResult>[writeResult]);
     _logReplayMove(writeResult: writeResult);
     _scheduleChallengeAutosave();
     _checkSolvedAndMaybeStartFinishSequence();
@@ -407,12 +410,12 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
       _isReplayStarting ||
       _isHintRequestInProgress;
 
-  Set<int> get _hiddenNumberValues {
+  Map<int, int> get _remainingNumberUsages {
     final SudokuGridData? gridData = _gridData;
     if (gridData == null) {
-      return const <int>{};
+      return const <int, int>{};
     }
-    return fullyUsedSudokuDigits(gridData.currentGrid);
+    return remainingSudokuDigitUsages(gridData.currentGrid);
   }
 
   bool get _canRequestHint {
@@ -422,6 +425,8 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
         !_isInteractionLocked &&
         _findHintTargetCell() != null;
   }
+
+  bool get _canUndo => !_isInteractionLocked && _undoHistory.isNotEmpty;
 
   bool get _isAdminSolveButtonEnabled {
     final bool? overrideEnabled = widget.adminSolveButtonEnabled;
@@ -493,6 +498,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
         debugPrint('[hint.flow] writeResult is null, hint was not applied');
         return;
       }
+      _recordUndoGroup(<_GridWriteResult>[writeResult]);
 
       debugPrint(
         '[hint.flow] hint applied: '
@@ -603,6 +609,17 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
       return;
     }
 
+    final List<_GridWriteResult> undoEntries = adminMoves
+        .map(
+          (_AdminReplayMove move) => _GridWriteResult(
+            row: move.row,
+            col: move.col,
+            previousValue: move.previousValue,
+            nextValue: move.nextValue,
+          ),
+        )
+        .toList(growable: false);
+
     setState(() {
       for (final _AdminReplayMove move in adminMoves) {
         gridData.currentGrid[move.row][move.col] = move.nextValue;
@@ -612,6 +629,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
         grid: gridData.currentGrid,
       );
     });
+    _recordUndoGroup(undoEntries);
 
     _scheduleChallengeAutosave();
     final DateTime actionTime = DateTime.now();
@@ -699,6 +717,43 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
     );
   }
 
+  void _recordUndoGroup(List<_GridWriteResult> writes) {
+    if (writes.isEmpty) {
+      return;
+    }
+    _undoHistory.add(_UndoActionGroup(writes: writes));
+  }
+
+  Future<void> _undoLastAction() async {
+    final SudokuGridData? gridData = _gridData;
+    if (!_canUndo || gridData == null) {
+      return;
+    }
+
+    final _UndoActionGroup undoGroup = _undoHistory.removeLast();
+    setState(() {
+      for (final _GridWriteResult write in undoGroup.writes.reversed) {
+        gridData.currentGrid[write.row][write.col] = write.previousValue;
+      }
+      _activeValue = _resolveSelectableActiveValue(
+        preferredValue: _activeValue,
+        grid: gridData.currentGrid,
+      );
+    });
+
+    final DateTime actionTime = DateTime.now();
+    for (final _GridWriteResult write in undoGroup.writes.reversed) {
+      await _replayLoggingController.logMove(
+        row: write.row,
+        col: write.col,
+        previousValue: write.nextValue,
+        nextValue: write.previousValue,
+        at: actionTime,
+      );
+    }
+    _scheduleChallengeAutosave();
+  }
+
   Future<void> _showHintHighlight(int cellIndex) async {
     if (!mounted) {
       debugPrint(
@@ -709,7 +764,6 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
 
     debugPrint('[hint.flow] hint highlight setup: cellIndex=$cellIndex');
     setState(() {
-      _isHintHighlightRunning = true;
       _hintHighlightCellIndex = cellIndex;
     });
 
@@ -723,7 +777,6 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
     }
 
     setState(() {
-      _isHintHighlightRunning = false;
       _hintHighlightCellIndex = null;
     });
     debugPrint('[hint.flow] hint highlight cleanup complete');
@@ -956,6 +1009,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
     if (gridData == null) {
       return const Center(child: CircularProgressIndicator());
     }
+    final AppLocalizations? l10n = AppLocalizations.of(context);
 
     return Column(
       children: <Widget>[
@@ -1001,38 +1055,31 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
           ),
         ),
         const SizedBox(height: 16),
-        Align(
-          alignment: Alignment.centerRight,
-          child: OutlinedButton(
-            key: const Key('sudoku-hint-button'),
-            onPressed: _canRequestHint ? _requestHint : null,
-            child:
-                _isHintRequestInProgress
-                    ? const SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                    : const Text('Hinweis'),
-          ),
+        SudokuActionBar(
+          isDeleteModeSelected: _activeValue == 0,
+          canUndo: _canUndo,
+          canSelectDeleteMode: !_isInteractionLocked,
+          canRequestHint: _canRequestHint,
+          isHintLoading: _isHintRequestInProgress,
+          showAdminSolve: _isAdminSolveButtonEnabled,
+          canUseAdminSolve: !_isInteractionLocked && !_isSolved,
+          undoLabel: l10n?.sudokuActionUndo ?? 'Zurueck',
+          deleteLabel: l10n?.sudokuActionDelete ?? 'Loeschen',
+          hintLabel: l10n?.sudokuActionHint ?? 'Hinweis',
+          adminSolveLabel: l10n?.sudokuActionAdminSolve ?? 'Loesen',
+          onUndo: _canUndo ? _undoLastAction : null,
+          onDeleteModeSelected:
+              !_isInteractionLocked ? () => _setActiveValue(0) : null,
+          onHint: _canRequestHint ? _requestHint : null,
+          onAdminSolve:
+              (_gridData == null || _isInteractionLocked || _isSolved)
+                  ? null
+                  : _fillSudokuForAdminTestLeavingOneCellOpen,
         ),
         const SizedBox(height: 12),
-        if (_isAdminSolveButtonEnabled) ...<Widget>[
-          Align(
-            alignment: Alignment.centerRight,
-            child: OutlinedButton(
-              key: const Key('admin-solve-sudoku-button'),
-              onPressed:
-                  (_gridData == null || _isInteractionLocked || _isSolved)
-                      ? null
-                      : _fillSudokuForAdminTestLeavingOneCellOpen,
-              child: const Text('Admin: fast loesen'),
-            ),
-          ),
-          const SizedBox(height: 12),
-        ],
         SudokuNumberPad(
           activeValue: _activeValue,
-          hiddenValues: _hiddenNumberValues,
+          remainingCounts: _remainingNumberUsages,
           enabled: !_isInteractionLocked,
           onValueSelected: _setActiveValue,
         ),
@@ -1357,6 +1404,12 @@ class _GridWriteResult {
   final int col;
   final int previousValue;
   final int nextValue;
+}
+
+class _UndoActionGroup {
+  const _UndoActionGroup({required this.writes});
+
+  final List<_GridWriteResult> writes;
 }
 
 class _InMemorySudokuReplayRepository implements SudokuReplayRepository {
