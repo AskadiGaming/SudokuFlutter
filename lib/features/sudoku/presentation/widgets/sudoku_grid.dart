@@ -25,6 +25,7 @@ class SudokuGrid extends StatelessWidget {
     required this.onCellTapped,
     required this.onViewportChanged,
     this.hiddenCellIndices = const <int>{},
+    this.hintHighlightCellIndex,
     this.interactionEnabled = true,
     super.key,
   });
@@ -45,6 +46,7 @@ class SudokuGrid extends StatelessWidget {
   final void Function(int row, int col) onCellTapped;
   final ValueChanged<Size> onViewportChanged;
   final Set<int> hiddenCellIndices;
+  final int? hintHighlightCellIndex;
   final bool interactionEnabled;
 
   @override
@@ -79,13 +81,18 @@ class SudokuGrid extends StatelessWidget {
           final int direction = textRotationDirections[index] ?? 1;
           final bool isFixed = gridData.isFixed[row][col];
           final bool isHighlighted = value != 0 && value == activeValue;
+          final bool isHintHighlighted = hintHighlightCellIndex == index;
 
           final Color baseColor =
               isFixed
                   ? theme.colorScheme.surfaceContainerHighest
                   : theme.colorScheme.surface;
           final Color backgroundColor =
-              isHighlighted ? theme.colorScheme.secondaryContainer : baseColor;
+              isHintHighlighted
+                  ? theme.colorScheme.errorContainer
+                  : isHighlighted
+                  ? theme.colorScheme.secondaryContainer
+                  : baseColor;
 
           final Widget cell = AnimatedOpacity(
             opacity: isHidden ? 0 : 1,
@@ -102,7 +109,12 @@ class SudokuGrid extends StatelessWidget {
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: backgroundColor,
-                    border: _buildCellBorder(context, row, col),
+                    border: _buildCellBorder(
+                      context,
+                      row,
+                      col,
+                      isHintHighlighted: isHintHighlighted,
+                    ),
                   ),
                   child:
                       value == 0
@@ -121,7 +133,9 @@ class SudokuGrid extends StatelessWidget {
                                 fontWeight:
                                     isFixed ? FontWeight.bold : FontWeight.w500,
                                 color:
-                                    isFixed
+                                    isHintHighlighted
+                                        ? theme.colorScheme.error
+                                        : isFixed
                                         ? theme.colorScheme.onSurface
                                         : theme.colorScheme.onSurfaceVariant,
                               ),
@@ -249,18 +263,33 @@ class SudokuGrid extends StatelessWidget {
     );
   }
 
-  Border _buildCellBorder(BuildContext context, int row, int col) {
-    final Color color = Theme.of(context).dividerColor;
+  Border _buildCellBorder(
+    BuildContext context,
+    int row,
+    int col, {
+    required bool isHintHighlighted,
+  }) {
+    final ThemeData theme = Theme.of(context);
+    final Color color =
+        isHintHighlighted ? theme.colorScheme.error : theme.dividerColor;
     final bool thickTop = row % 3 == 0;
     final bool thickLeft = col % 3 == 0;
     final bool thickBottom = row == 8;
     final bool thickRight = col == 8;
+    final double thinWidth = isHintHighlighted ? 2 : 0.5;
+    final double thickWidth = isHintHighlighted ? 3 : 2;
 
     return Border(
-      top: BorderSide(width: thickTop ? 2 : 0.5, color: color),
-      left: BorderSide(width: thickLeft ? 2 : 0.5, color: color),
-      right: BorderSide(width: thickRight ? 2 : 0.5, color: color),
-      bottom: BorderSide(width: thickBottom ? 2 : 0.5, color: color),
+      top: BorderSide(width: thickTop ? thickWidth : thinWidth, color: color),
+      left: BorderSide(width: thickLeft ? thickWidth : thinWidth, color: color),
+      right: BorderSide(
+        width: thickRight ? thickWidth : thinWidth,
+        color: color,
+      ),
+      bottom: BorderSide(
+        width: thickBottom ? thickWidth : thinWidth,
+        color: color,
+      ),
     );
   }
 }

@@ -5,6 +5,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
+import '../../ads/application/show_ad_for_hint_use_case.dart';
+import '../../ads/infrastructure/debug_analytics_service.dart';
+import '../../ads/infrastructure/unity_ads_config.dart';
+import '../../ads/infrastructure/unity_ads_service.dart';
 import '../../challenge/data/challenge_repository.dart';
 import '../../challenge/data/local_challenge_repository.dart';
 import '../../challenge/domain/challenge_round_data.dart';
@@ -56,6 +60,7 @@ class PlaySudokuPage extends StatefulWidget {
     this.adminTestOverrideConfig,
     this.adminTestOverrideEnabled,
     this.adminSolveButtonEnabled,
+    this.showAdForHintUseCase,
     this.random,
     super.key,
   });
@@ -73,6 +78,7 @@ class PlaySudokuPage extends StatefulWidget {
   final AdminTestSudokuConfig? adminTestOverrideConfig;
   final bool? adminTestOverrideEnabled;
   final bool? adminSolveButtonEnabled;
+  final ShowAdForHintUseCase? showAdForHintUseCase;
   final Random? random;
 
   @override
@@ -83,6 +89,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
     with TickerProviderStateMixin, WidgetsBindingObserver {
   static const String _goatAssetPath = 'assets/images/modifiers/goat.png';
   static const Duration _finishStepDelay = Duration(milliseconds: 45);
+  static const Duration _hintHighlightDuration = Duration(seconds: 5);
   static final List<int> _spiralOrder = buildSpiralOrder9x9();
 
   late final SudokuPuzzleRepository _repository =
@@ -99,6 +106,12 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
           : LocalSudokuReplayRepository());
   late final SudokuReplayLoggingController _replayLoggingController =
       SudokuReplayLoggingController(repository: _replayRepository);
+  late final ShowAdForHintUseCase _showAdForHintUseCase =
+      widget.showAdForHintUseCase ??
+      ShowAdForHintUseCase(
+        adService: UnityAdsService(config: UnityAdsConfig.fromEnvironment()),
+        analyticsService: DebugAnalyticsService(),
+      );
   late final Random _random = widget.random ?? Random();
 
   late final AnimationController _rotationController;
@@ -132,6 +145,9 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
   bool _isFinishSequenceRunning = false;
   bool _showSolvedOverlay = false;
   bool _isReplayStarting = false;
+  bool _isHintRequestInProgress = false;
+  bool _isHintHighlightRunning = false;
+  int? _hintHighlightCellIndex;
   final Set<int> _hiddenCellIndices = <int>{};
   ChallengeRoundData? _activeChallengeRound;
   Timer? _challengeAutosaveTimer;
@@ -348,32 +364,15 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
       return;
     }
 
-    final int previousValue = gridData.currentGrid[row][col];
-    if (previousValue == _activeValue) {
+    final _GridWriteResult? writeResult = _writeValueToCell(
+      row: row,
+      col: col,
+      nextValue: _activeValue,
+    );
+    if (writeResult == null) {
       return;
     }
-
-    setState(() {
-      gridData.currentGrid[row][col] = _activeValue;
-      if (_activeModifier == SudokuModifierType.textRotation &&
-          _activeValue != 0) {
-        final int index = (row * 9) + col;
-        _textRotationDirections.putIfAbsent(
-          index,
-          () => _random.nextBool() ? 1 : -1,
-        );
-      }
-    });
-    final DateTime moveTime = DateTime.now();
-    unawaited(
-      _replayLoggingController.logMove(
-        row: row,
-        col: col,
-        previousValue: previousValue,
-        nextValue: _activeValue,
-        at: moveTime,
-      ),
-    );
+    _logReplayMove(writeResult: writeResult);
     _scheduleChallengeAutosave();
     _checkSolvedAndMaybeStartFinishSequence();
   }
@@ -387,7 +386,18 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
   }
 
   bool get _isInteractionLocked =>
-      _isFinishSequenceRunning || _showSolvedOverlay || _isReplayStarting;
+      _isFinishSequenceRunning ||
+      _showSolvedOverlay ||
+      _isReplayStarting ||
+      _isHintRequestInProgress;
+
+  bool get _canRequestHint {
+    return _showAdForHintUseCase.supportsCurrentPlatform &&
+        _gridData != null &&
+        !_isSolved &&
+        !_isInteractionLocked &&
+        _findHintTargetCell() != null;
+  }
 
   bool get _isAdminSolveButtonEnabled {
     final bool? overrideEnabled = widget.adminSolveButtonEnabled;
@@ -395,6 +405,117 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
       return overrideEnabled;
     }
     return ADMIN_BUTTON_SUDOKU_SOLVE;
+  }
+
+  Future<void> _requestHint() async {
+    final _HintTargetCell? targetCell = _findHintTargetCell();
+    final ScaffoldMessengerState? messenger = ScaffoldMessenger.maybeOf(
+      context,
+    );
+    if (targetCell == null || !_canRequestHint) {
+      debugPrint(
+        '[hint.flow] request aborted: '
+        'targetCell=$targetCell, '
+        'canRequestHint=$_canRequestHint, '
+        'hasGrid=${_gridData != null}, '
+        'isSolved=$_isSolved, '
+        'isInteractionLocked=$_isInteractionLocked',
+      );
+      return;
+    }
+
+    debugPrint(
+      '[hint.flow] request started: '
+      'targetCell=row=${targetCell.row}, col=${targetCell.col}, index=${targetCell.index}',
+    );
+
+    setState(() {
+      _isHintRequestInProgress = true;
+    });
+
+    try {
+      final HintAdResult adResult = await _showAdForHintUseCase.execute();
+      debugPrint('[hint.flow] ad result=$adResult');
+      if (!mounted) {
+        debugPrint('[hint.flow] widget unmounted after ad result');
+        return;
+      }
+      if (adResult != HintAdResult.granted) {
+        debugPrint('[hint.flow] hint not granted, showing snackbar');
+        messenger?.showSnackBar(
+          SnackBar(content: Text(_messageForHintAdResult(adResult))),
+        );
+        return;
+      }
+
+      final SudokuGridData? gridData = _gridData;
+      if (gridData == null) {
+        debugPrint('[hint.flow] gridData is null after granted ad');
+        return;
+      }
+
+      debugPrint(
+        '[hint.flow] applying hint: '
+        'row=${targetCell.row}, col=${targetCell.col}, '
+        'currentValue=${gridData.currentGrid[targetCell.row][targetCell.col]}, '
+        'solutionValue=${gridData.solutionGrid[targetCell.row][targetCell.col]}',
+      );
+      final _GridWriteResult? writeResult = _writeValueToCell(
+        row: targetCell.row,
+        col: targetCell.col,
+        nextValue: gridData.solutionGrid[targetCell.row][targetCell.col],
+      );
+      if (writeResult == null) {
+        debugPrint('[hint.flow] writeResult is null, hint was not applied');
+        return;
+      }
+
+      debugPrint(
+        '[hint.flow] hint applied: '
+        'previousValue=${writeResult.previousValue}, '
+        'nextValue=${writeResult.nextValue}',
+      );
+      _logReplayMove(writeResult: writeResult);
+      debugPrint('[hint.flow] replay move logged');
+      _scheduleChallengeAutosave();
+      debugPrint('[hint.flow] autosave scheduled');
+
+      if (!mounted) {
+        debugPrint('[hint.flow] widget unmounted before highlight start');
+        return;
+      }
+      setState(() {
+        _isHintRequestInProgress = false;
+      });
+
+      debugPrint('[hint.flow] starting hint highlight');
+      await _showHintHighlight(targetCell.index);
+      if (!mounted) {
+        debugPrint('[hint.flow] widget unmounted after hint highlight');
+        return;
+      }
+      debugPrint('[hint.flow] hint highlight completed, checking solved state');
+      _checkSolvedAndMaybeStartFinishSequence();
+      debugPrint('[hint.flow] request completed successfully');
+      return;
+    } catch (error, stackTrace) {
+      debugPrint('[hint.flow] failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (mounted) {
+        messenger?.showSnackBar(
+          const SnackBar(
+            content: Text('Hinweis konnte gerade nicht geladen werden.'),
+          ),
+        );
+      }
+      return;
+    } finally {
+      if (mounted && _isHintRequestInProgress) {
+        setState(() {
+          _isHintRequestInProgress = false;
+        });
+      }
+    }
   }
 
   void _checkSolvedAndMaybeStartFinishSequence() {
@@ -474,6 +595,116 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
         nextValue: move.nextValue,
         at: actionTime,
       );
+    }
+  }
+
+  _HintTargetCell? _findHintTargetCell() {
+    final SudokuGridData? gridData = _gridData;
+    if (gridData == null) {
+      return null;
+    }
+
+    for (int index = 0; index < 81; index++) {
+      final int row = index ~/ 9;
+      final int col = index % 9;
+      if (gridData.isFixed[row][col]) {
+        continue;
+      }
+      if (gridData.currentGrid[row][col] == gridData.solutionGrid[row][col]) {
+        continue;
+      }
+      return _HintTargetCell(row: row, col: col);
+    }
+
+    return null;
+  }
+
+  _GridWriteResult? _writeValueToCell({
+    required int row,
+    required int col,
+    required int nextValue,
+  }) {
+    final SudokuGridData? gridData = _gridData;
+    if (gridData == null) {
+      return null;
+    }
+
+    final int previousValue = gridData.currentGrid[row][col];
+    if (previousValue == nextValue) {
+      return null;
+    }
+
+    setState(() {
+      gridData.currentGrid[row][col] = nextValue;
+      if (_activeModifier == SudokuModifierType.textRotation &&
+          nextValue != 0) {
+        final int index = (row * 9) + col;
+        _textRotationDirections.putIfAbsent(
+          index,
+          () => _random.nextBool() ? 1 : -1,
+        );
+      }
+    });
+
+    return _GridWriteResult(
+      row: row,
+      col: col,
+      previousValue: previousValue,
+      nextValue: nextValue,
+    );
+  }
+
+  void _logReplayMove({required _GridWriteResult writeResult}) {
+    final DateTime moveTime = DateTime.now();
+    unawaited(
+      _replayLoggingController.logMove(
+        row: writeResult.row,
+        col: writeResult.col,
+        previousValue: writeResult.previousValue,
+        nextValue: writeResult.nextValue,
+        at: moveTime,
+      ),
+    );
+  }
+
+  Future<void> _showHintHighlight(int cellIndex) async {
+    if (!mounted) {
+      debugPrint(
+        '[hint.flow] hint highlight aborted before start: widget unmounted',
+      );
+      return;
+    }
+
+    debugPrint('[hint.flow] hint highlight setup: cellIndex=$cellIndex');
+    setState(() {
+      _isHintHighlightRunning = true;
+      _hintHighlightCellIndex = cellIndex;
+    });
+
+    await Future<void>.delayed(_hintHighlightDuration);
+
+    if (!mounted) {
+      debugPrint(
+        '[hint.flow] hint highlight cleanup skipped: widget unmounted',
+      );
+      return;
+    }
+
+    setState(() {
+      _isHintHighlightRunning = false;
+      _hintHighlightCellIndex = null;
+    });
+    debugPrint('[hint.flow] hint highlight cleanup complete');
+  }
+
+  String _messageForHintAdResult(HintAdResult adResult) {
+    switch (adResult) {
+      case HintAdResult.granted:
+        return 'Hinweis freigeschaltet.';
+      case HintAdResult.unavailable:
+        return 'Gerade ist kein Hinweis-Werbespot verfuegbar.';
+      case HintAdResult.failed:
+        return 'Der Hinweis konnte nicht geladen werden.';
     }
   }
 
@@ -568,6 +799,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
                 adminTestOverrideConfig: widget.adminTestOverrideConfig,
                 adminTestOverrideEnabled: widget.adminTestOverrideEnabled,
                 adminSolveButtonEnabled: widget.adminSolveButtonEnabled,
+                showAdForHintUseCase: widget.showAdForHintUseCase,
                 random: widget.random,
               ),
         ),
@@ -700,6 +932,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
                       onCellTapped: _writeActiveNumberToCell,
                       onViewportChanged: _updateGoatViewport,
                       hiddenCellIndices: _hiddenCellIndices,
+                      hintHighlightCellIndex: _hintHighlightCellIndex,
                       interactionEnabled: !_isInteractionLocked,
                     ),
                     if (_showSolvedOverlay) _buildSolvedOverlay(context),
@@ -710,6 +943,21 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
           ),
         ),
         const SizedBox(height: 16),
+        Align(
+          alignment: Alignment.centerRight,
+          child: OutlinedButton(
+            key: const Key('sudoku-hint-button'),
+            onPressed: _canRequestHint ? _requestHint : null,
+            child:
+                _isHintRequestInProgress
+                    ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                    : const Text('Hinweis'),
+          ),
+        ),
+        const SizedBox(height: 12),
         if (_isAdminSolveButtonEnabled) ...<Widget>[
           Align(
             alignment: Alignment.centerRight,
@@ -937,6 +1185,29 @@ class _LoadedPuzzleData {
 
 class _AdminReplayMove {
   const _AdminReplayMove({
+    required this.row,
+    required this.col,
+    required this.previousValue,
+    required this.nextValue,
+  });
+
+  final int row;
+  final int col;
+  final int previousValue;
+  final int nextValue;
+}
+
+class _HintTargetCell {
+  const _HintTargetCell({required this.row, required this.col});
+
+  final int row;
+  final int col;
+
+  int get index => (row * 9) + col;
+}
+
+class _GridWriteResult {
+  const _GridWriteResult({
     required this.row,
     required this.col,
     required this.previousValue,

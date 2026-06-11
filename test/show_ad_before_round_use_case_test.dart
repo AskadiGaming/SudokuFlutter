@@ -212,7 +212,7 @@ class _FakeAdService implements AdService {
 
   @override
   Future<AdShowResult> showInterstitialAndWait({
-    required Duration timeout,
+    required Duration loadTimeout,
   }) async {
     showCalls += 1;
     return showResult;

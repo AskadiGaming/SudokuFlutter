@@ -9,7 +9,7 @@ class ShowAdBeforeRoundUseCase {
     required this.analyticsService,
     required this.roundCounterStore,
     required this.policy,
-    this.timeout = const Duration(seconds: 8),
+    this.loadTimeout = const Duration(seconds: 8),
     DateTime Function()? nowProvider,
   }) : _nowProvider = nowProvider ?? DateTime.now;
 
@@ -17,7 +17,7 @@ class ShowAdBeforeRoundUseCase {
   final AnalyticsService analyticsService;
   final AdRoundCounterStore roundCounterStore;
   final AdPolicy policy;
-  final Duration timeout;
+  final Duration loadTimeout;
   final DateTime Function() _nowProvider;
 
   int? _roundsSinceLastAd;
@@ -83,7 +83,7 @@ class ShowAdBeforeRoundUseCase {
     }
 
     final AdShowResult result = await adService.showInterstitialAndWait(
-      timeout: timeout,
+      loadTimeout: loadTimeout,
     );
 
     switch (result) {

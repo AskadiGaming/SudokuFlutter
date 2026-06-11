@@ -5,5 +5,5 @@ abstract class AdService {
 
   Future<void> initialize();
 
-  Future<AdShowResult> showInterstitialAndWait({required Duration timeout});
+  Future<AdShowResult> showInterstitialAndWait({required Duration loadTimeout});
 }

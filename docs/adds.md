@@ -140,6 +140,53 @@ Die IDs werden zur Laufzeit per `--dart-define` injiziert. Genutzte Schluessel:
 - `UNITY_ADS_IOS_INTERSTITIAL_PLACEMENT_ID_RELEASE`
 - `UNITY_ADS_TEST_MODE` (`true` oder `false`)
 
+## Lokale zentrale Config fuer Debug und Release
+Fuer lokale Starts und Builds ohne Zusatzparameter gibt es eine zentrale Fallback-Datei:
+
+- `lib/features/ads/infrastructure/unity_ads_local_config.dart`
+
+Dort koennen die Werte getrennt nach Plattform und Build-Modus gepflegt werden:
+
+```dart
+// Android Debug
+const String UNITY_ADS_LOCAL_ANDROID_GAME_ID_DEBUG = 'DEINE_ANDROID_GAME_ID_DEBUG';
+const String UNITY_ADS_LOCAL_ANDROID_INTERSTITIAL_PLACEMENT_ID_DEBUG =
+    'DEIN_ANDROID_INTERSTITIAL_DEBUG';
+
+// Android Release
+const String UNITY_ADS_LOCAL_ANDROID_GAME_ID_RELEASE =
+    'DEINE_ANDROID_GAME_ID_RELEASE';
+const String UNITY_ADS_LOCAL_ANDROID_INTERSTITIAL_PLACEMENT_ID_RELEASE =
+    'DEIN_ANDROID_INTERSTITIAL_RELEASE';
+
+// iOS Debug
+const String UNITY_ADS_LOCAL_IOS_GAME_ID_DEBUG = 'DEINE_IOS_GAME_ID_DEBUG';
+const String UNITY_ADS_LOCAL_IOS_INTERSTITIAL_PLACEMENT_ID_DEBUG =
+    'DEIN_IOS_INTERSTITIAL_DEBUG';
+
+// iOS Release
+const String UNITY_ADS_LOCAL_IOS_GAME_ID_RELEASE = 'DEINE_IOS_GAME_ID_RELEASE';
+const String UNITY_ADS_LOCAL_IOS_INTERSTITIAL_PLACEMENT_ID_RELEASE =
+    'DEIN_IOS_INTERSTITIAL_RELEASE';
+```
+
+Wichtig:
+- `--dart-define` hat weiterhin Vorrang, falls gesetzt.
+- Wenn kein `dart-define` gesetzt ist, wird auf diese lokale Datei zurueckgegriffen.
+- Das gilt jetzt sowohl fuer `debug` als auch fuer `release`.
+
+Damit reicht fuer Android lokal anschliessend einfach:
+
+```powershell
+flutter run -d android
+```
+
+Und fuer einen lokalen Release-Build ohne weitere Parameter:
+
+```powershell
+flutter build appbundle
+```
+
 ## Windows PowerShell Beispiel (Session-Variablen setzen)
 ```powershell
 $env:UNITY_ADS_ANDROID_GAME_ID_DEBUG="DEINE_ANDROID_GAME_ID_DEBUG"
