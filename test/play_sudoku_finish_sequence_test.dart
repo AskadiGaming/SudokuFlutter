@@ -183,10 +183,10 @@ void main() {
     );
     expect(tester.widget<AnimatedOpacity>(firstCellOpacity).opacity, 0);
 
-    final ToggleButtons numberPad = tester.widget<ToggleButtons>(
-      find.byKey(const Key('number-toggle-buttons')),
+    final InkWell numberPadButton = tester.widget<InkWell>(
+      find.byKey(const Key('number-button-delete')),
     );
-    expect(numberPad.onPressed, isNull);
+    expect(numberPadButton.onTap, isNull);
 
     await tester.pump(const Duration(seconds: 5));
 
@@ -348,7 +348,9 @@ class _RecordingSudokuReplayRepository implements SudokuReplayRepository {
               .toList(),
       sessions:
           _sessions
-              .where((SudokuPlaySession session) => session.replayId == replayId)
+              .where(
+                (SudokuPlaySession session) => session.replayId == replayId,
+              )
               .toList(),
     );
   }

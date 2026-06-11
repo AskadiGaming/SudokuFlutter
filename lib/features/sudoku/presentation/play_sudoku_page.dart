@@ -35,6 +35,7 @@ import '../domain/sudoku_difficulty.dart';
 import '../domain/sudoku_finish_logic.dart';
 import '../domain/sudoku_grid_parser.dart';
 import '../domain/sudoku_modifier_config.dart';
+import '../domain/sudoku_number_availability.dart';
 import '../domain/sudoku_modifier_type.dart';
 import '../domain/sudoku_round_config.dart';
 import '../domain/sudoku_round_mode.dart';
@@ -224,6 +225,10 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
       setState(() {
         _gridData = loaded.gridData;
         _activeChallengeRound = loaded.challengeRoundData;
+        _activeValue = _resolveSelectableActiveValue(
+          preferredValue: _activeValue,
+          grid: loaded.gridData.currentGrid,
+        );
         _roundStartedAt = loaded.startedAt;
         _isSolved = loaded.challengeRoundData?.isCompleted ?? false;
         _isFinishSequenceRunning = false;
@@ -352,7 +357,10 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
       return;
     }
     setState(() {
-      _activeValue = value;
+      _activeValue = _resolveSelectableActiveValue(
+        preferredValue: value,
+        grid: _gridData?.currentGrid,
+      );
     });
   }
 
@@ -390,6 +398,14 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
       _showSolvedOverlay ||
       _isReplayStarting ||
       _isHintRequestInProgress;
+
+  Set<int> get _hiddenNumberValues {
+    final SudokuGridData? gridData = _gridData;
+    if (gridData == null) {
+      return const <int>{};
+    }
+    return fullyUsedSudokuDigits(gridData.currentGrid);
+  }
 
   bool get _canRequestHint {
     return _showAdForHintUseCase.supportsCurrentPlatform &&
@@ -583,6 +599,10 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
       for (final _AdminReplayMove move in adminMoves) {
         gridData.currentGrid[move.row][move.col] = move.nextValue;
       }
+      _activeValue = _resolveSelectableActiveValue(
+        preferredValue: _activeValue,
+        grid: gridData.currentGrid,
+      );
     });
 
     _scheduleChallengeAutosave();
@@ -636,6 +656,10 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
 
     setState(() {
       gridData.currentGrid[row][col] = nextValue;
+      _activeValue = _resolveSelectableActiveValue(
+        preferredValue: _activeValue,
+        grid: gridData.currentGrid,
+      );
       if (_activeModifier == SudokuModifierType.textRotation &&
           nextValue != 0) {
         final int index = (row * 9) + col;
@@ -974,11 +998,37 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
         ],
         SudokuNumberPad(
           activeValue: _activeValue,
+          hiddenValues: _hiddenNumberValues,
           enabled: !_isInteractionLocked,
           onValueSelected: _setActiveValue,
         ),
       ],
     );
+  }
+
+  int _resolveSelectableActiveValue({
+    required int preferredValue,
+    required List<List<int>>? grid,
+  }) {
+    if (preferredValue == 0) {
+      return 0;
+    }
+    if (grid == null) {
+      return preferredValue;
+    }
+
+    final Set<int> hiddenDigits = fullyUsedSudokuDigits(grid);
+    if (!hiddenDigits.contains(preferredValue)) {
+      return preferredValue;
+    }
+
+    for (int value = 1; value <= 9; value++) {
+      if (!hiddenDigits.contains(value)) {
+        return value;
+      }
+    }
+
+    return 0;
   }
 
   Widget _buildSolvedOverlay(BuildContext context) {

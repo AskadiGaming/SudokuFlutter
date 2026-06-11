@@ -25,23 +25,27 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    ToggleButtons buttons = tester.widget(find.byType(ToggleButtons));
-    expect(buttons.isSelected.where((bool item) => item).length, 1);
-    expect(buttons.isSelected[0], isTrue);
+    expect(find.byKey(const Key('number-button-1-selected')), findsOneWidget);
+    expect(find.byKey(const Key('number-button-3-selected')), findsNothing);
+    expect(
+      find.byKey(const Key('number-button-delete-selected')),
+      findsNothing,
+    );
 
     await tester.tap(find.byKey(const Key('number-button-3')));
     await tester.pumpAndSettle();
 
-    buttons = tester.widget(find.byType(ToggleButtons));
-    expect(buttons.isSelected.where((bool item) => item).length, 1);
-    expect(buttons.isSelected[2], isTrue);
+    expect(find.byKey(const Key('number-button-1-selected')), findsNothing);
+    expect(find.byKey(const Key('number-button-3-selected')), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('number-button-delete')));
     await tester.pumpAndSettle();
 
-    buttons = tester.widget(find.byType(ToggleButtons));
-    expect(buttons.isSelected.where((bool item) => item).length, 1);
-    expect(buttons.isSelected[9], isTrue);
+    expect(find.byKey(const Key('number-button-3-selected')), findsNothing);
+    expect(
+      find.byKey(const Key('number-button-delete-selected')),
+      findsOneWidget,
+    );
   });
 
   testWidgets(

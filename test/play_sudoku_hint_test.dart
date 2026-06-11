@@ -7,6 +7,8 @@ import 'package:hello_world_app/features/sudoku/data/sudoku_puzzle_repository.da
 import 'package:hello_world_app/features/sudoku/domain/sudoku_difficulty.dart';
 import 'package:hello_world_app/features/sudoku/domain/sudoku_round_config.dart';
 import 'package:hello_world_app/features/sudoku/presentation/play_sudoku_page.dart';
+import 'package:hello_world_app/features/sudoku_history/data/completed_sudoku_log_repository.dart';
+import 'package:hello_world_app/features/sudoku_history/domain/completed_sudoku_entry.dart';
 
 void main() {
   testWidgets('hint fills first incorrect editable cell and highlights it', (
@@ -29,6 +31,7 @@ void main() {
             ),
             analyticsService: _FakeAnalyticsService(),
           ),
+          completedSudokuLogRepository: _NoopCompletedSudokuLogRepository(),
           adminTestOverrideEnabled: false,
         ),
       ),
@@ -110,6 +113,7 @@ void main() {
             ),
             analyticsService: _FakeAnalyticsService(),
           ),
+          completedSudokuLogRepository: _NoopCompletedSudokuLogRepository(),
           adminTestOverrideEnabled: false,
         ),
       ),
@@ -153,6 +157,7 @@ void main() {
             ),
             analyticsService: _FakeAnalyticsService(),
           ),
+          completedSudokuLogRepository: _NoopCompletedSudokuLogRepository(),
           adminTestOverrideEnabled: false,
         ),
       ),
@@ -163,7 +168,7 @@ void main() {
     await tester.tap(find.byKey(const Key('sudoku-hint-button')));
     await tester.pump();
 
-    await tester.tap(find.byKey(const Key('number-button-1')));
+    await tester.tap(find.byKey(const Key('number-button-3')));
     await tester.pump();
     await tester.tap(find.byKey(const Key('sudoku-cell-0-1')));
     await tester.pump();
@@ -171,15 +176,10 @@ void main() {
     expect(
       find.descendant(
         of: find.byKey(const Key('sudoku-cell-0-1')),
-        matching: find.text('1'),
+        matching: find.text('3'),
       ),
       findsOneWidget,
     );
-
-    final ToggleButtons buttons = tester.widget<ToggleButtons>(
-      find.byKey(const Key('number-toggle-buttons')),
-    );
-    expect(buttons.onPressed, isNotNull);
 
     await tester.pump(const Duration(seconds: 6));
     await tester.pumpAndSettle();
@@ -226,4 +226,15 @@ class _FakeAnalyticsService implements AnalyticsService {
     String eventName, {
     Map<String, Object?> parameters = const {},
   }) {}
+}
+
+class _NoopCompletedSudokuLogRepository
+    implements CompletedSudokuLogRepository {
+  @override
+  Future<void> addCompletedSudoku(CompletedSudokuEntry entry) async {}
+
+  @override
+  Future<List<CompletedSudokuEntry>> getCompletedSudokus() async {
+    return <CompletedSudokuEntry>[];
+  }
 }
