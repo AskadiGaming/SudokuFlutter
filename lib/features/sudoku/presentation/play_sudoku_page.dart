@@ -48,6 +48,7 @@ import 'modifiers/models/rain_drop.dart';
 import 'modifiers/widgets/rain_overlay.dart';
 import 'widgets/modifier_banner.dart';
 import 'widgets/number_pad.dart';
+import 'widgets/sudoku_round_timer.dart';
 import 'widgets/sudoku_grid.dart';
 
 class PlaySudokuPage extends StatefulWidget {
@@ -91,6 +92,8 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
   static const String _goatAssetPath = 'assets/images/modifiers/goat.png';
   static const Duration _finishStepDelay = Duration(milliseconds: 45);
   static const Duration _hintHighlightDuration = Duration(seconds: 5);
+  static const Duration _roundClockTick = Duration(seconds: 1);
+  static const double _roundTimerReservedHeight = 20;
   static final List<int> _spiralOrder = buildSpiralOrder9x9();
 
   late final SudokuPuzzleRepository _repository =
@@ -152,9 +155,11 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
   final Set<int> _hiddenCellIndices = <int>{};
   ChallengeRoundData? _activeChallengeRound;
   Timer? _challengeAutosaveTimer;
+  Timer? _roundClockTimer;
   DateTime? _roundStartedAt;
   bool _completedSudokuLogged = false;
   bool _isReplayReady = false;
+  Duration _visibleElapsed = Duration.zero;
 
   @override
   void initState() {
@@ -246,8 +251,10 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
         return;
       }
       setState(() {
+        _visibleElapsed = _elapsedDurationAt(DateTime.now());
         _isReplayReady = true;
       });
+      _startRoundClockIfNeeded();
       _startModifierLifecycleIfNeeded();
       if (!(loaded.challengeRoundData?.isCompleted ?? false)) {
         _checkSolvedAndMaybeStartFinishSequence();
@@ -256,6 +263,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
       if (!mounted) {
         return;
       }
+      _stopRoundClock();
       setState(() {
         _loadingError = error;
       });
@@ -738,6 +746,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
     }
 
     final DateTime completedAt = DateTime.now();
+    _stopRoundClock(syncAt: completedAt);
     await _replayLoggingController.complete(
       finalGridString: _gridToString(_gridData!.currentGrid),
       completedAt: completedAt,
@@ -841,6 +850,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
   void dispose() {
     _isDisposing = true;
     WidgetsBinding.instance.removeObserver(this);
+    _stopRoundClock();
     if (_challengeAutosaveTimer != null) {
       _challengeAutosaveTimer!.cancel();
       _challengeAutosaveTimer = null;
@@ -865,11 +875,16 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
         state == AppLifecycleState.inactive ||
         state == AppLifecycleState.detached ||
         state == AppLifecycleState.hidden) {
-      unawaited(_replayLoggingController.pauseSession(DateTime.now()));
+      final DateTime pausedAt = DateTime.now();
+      _stopRoundClock(syncAt: pausedAt);
+      unawaited(_replayLoggingController.pauseSession(pausedAt));
       return;
     }
     if (state == AppLifecycleState.resumed) {
-      unawaited(_replayLoggingController.startSession(DateTime.now()));
+      final DateTime resumedAt = DateTime.now();
+      unawaited(_replayLoggingController.startSession(resumedAt));
+      _syncVisibleElapsed(resumedAt);
+      _startRoundClockIfNeeded();
     }
   }
 
@@ -894,6 +909,15 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
                   padding: const EdgeInsets.all(16),
                   child: _buildContent(context),
                 ),
+                if (_shouldShowRoundTimer)
+                  Positioned(
+                    top: 16,
+                    left: 16,
+                    child: SudokuRoundTimer(
+                      key: const Key('sudoku-round-timer'),
+                      elapsed: _visibleElapsed,
+                    ),
+                  ),
                 if (showRainOverlay)
                   Positioned.fill(
                     child: RainOverlay(
@@ -926,6 +950,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
 
     return Column(
       children: <Widget>[
+        const SizedBox(height: _roundTimerReservedHeight),
         if (widget.roundConfig.crazyModeEnabled)
           ModifierBanner(activeModifier: _activeModifier),
         if (widget.roundConfig.crazyModeEnabled) const SizedBox(height: 12),
@@ -1029,6 +1054,47 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
     }
 
     return 0;
+  }
+
+  bool get _shouldShowRoundTimer =>
+      _loadingError == null && _gridData != null && _isReplayReady;
+
+  Duration _elapsedDurationAt(DateTime now) {
+    return Duration(
+      milliseconds: _replayLoggingController.currentElapsedMillis(now),
+    );
+  }
+
+  void _startRoundClockIfNeeded() {
+    if (!_isReplayReady || _isSolved || _showSolvedOverlay || _isDisposing) {
+      return;
+    }
+    _roundClockTimer?.cancel();
+    _roundClockTimer = Timer.periodic(_roundClockTick, (_) {
+      _syncVisibleElapsed(DateTime.now());
+    });
+  }
+
+  void _stopRoundClock({DateTime? syncAt}) {
+    _roundClockTimer?.cancel();
+    _roundClockTimer = null;
+    if (syncAt != null) {
+      _syncVisibleElapsed(syncAt);
+    }
+  }
+
+  void _syncVisibleElapsed(DateTime now) {
+    final Duration nextElapsed = _elapsedDurationAt(now);
+    if (_visibleElapsed == nextElapsed) {
+      return;
+    }
+    if (!mounted) {
+      _visibleElapsed = nextElapsed;
+      return;
+    }
+    setState(() {
+      _visibleElapsed = nextElapsed;
+    });
   }
 
   Widget _buildSolvedOverlay(BuildContext context) {
