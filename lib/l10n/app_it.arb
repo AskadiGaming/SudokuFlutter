@@ -36,6 +36,7 @@
   "sudokuPlayAgain": "Gioca di nuovo",
   "sudokuActionUndo": "Annulla",
   "sudokuActionDelete": "Cancella",
+  "sudokuActionNote": "Nota",
   "sudokuActionHint": "Suggerimento",
   "sudokuActionAdminSolve": "Risolvi",
   "showCompletedSudokus": "Mostra sudoku completati",

@@ -36,6 +36,7 @@
   "sudokuPlayAgain": "Play again",
   "sudokuActionUndo": "Undo",
   "sudokuActionDelete": "Delete",
+  "sudokuActionNote": "Note",
   "sudokuActionHint": "Hint",
   "sudokuActionAdminSolve": "Solve",
   "showCompletedSudokus": "Show completed sudokus",

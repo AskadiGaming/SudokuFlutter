@@ -3,36 +3,44 @@ import 'package:flutter/material.dart';
 class SudokuActionBar extends StatelessWidget {
   const SudokuActionBar({
     required this.isDeleteModeSelected,
+    required this.isNoteModeSelected,
     required this.canUndo,
     required this.canSelectDeleteMode,
+    required this.canSelectNoteMode,
     required this.canRequestHint,
     required this.isHintLoading,
     required this.showAdminSolve,
     required this.canUseAdminSolve,
     required this.undoLabel,
     required this.deleteLabel,
+    required this.noteLabel,
     required this.hintLabel,
     required this.adminSolveLabel,
     this.onUndo,
     this.onDeleteModeSelected,
+    this.onNoteModeSelected,
     this.onHint,
     this.onAdminSolve,
     super.key,
   });
 
   final bool isDeleteModeSelected;
+  final bool isNoteModeSelected;
   final bool canUndo;
   final bool canSelectDeleteMode;
+  final bool canSelectNoteMode;
   final bool canRequestHint;
   final bool isHintLoading;
   final bool showAdminSolve;
   final bool canUseAdminSolve;
   final String undoLabel;
   final String deleteLabel;
+  final String noteLabel;
   final String hintLabel;
   final String adminSolveLabel;
   final VoidCallback? onUndo;
   final VoidCallback? onDeleteModeSelected;
+  final VoidCallback? onNoteModeSelected;
   final VoidCallback? onHint;
   final VoidCallback? onAdminSolve;
 
@@ -56,6 +64,15 @@ class SudokuActionBar extends StatelessWidget {
         enabled: canSelectDeleteMode,
         isSelected: isDeleteModeSelected,
         onPressed: onDeleteModeSelected,
+      ),
+      _ActionBarButton(
+        key: const Key('sudoku-action-note'),
+        keyName: 'sudoku-action-note',
+        label: noteLabel,
+        icon: Icons.edit_outlined,
+        enabled: canSelectNoteMode,
+        isSelected: isNoteModeSelected,
+        onPressed: onNoteModeSelected,
       ),
       _ActionBarButton(
         key: const Key('sudoku-hint-button'),

@@ -36,6 +36,7 @@
   "sudokuPlayAgain": "Erneut spielen",
   "sudokuActionUndo": "Zurueck",
   "sudokuActionDelete": "Loeschen",
+  "sudokuActionNote": "Notiz",
   "sudokuActionHint": "Hinweis",
   "sudokuActionAdminSolve": "Loesen",
   "showCompletedSudokus": "Abgeschlossene Sudokus anzeigen",

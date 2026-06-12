@@ -10,6 +10,7 @@ import 'sudoku_split_math.dart';
 class SudokuGrid extends StatelessWidget {
   const SudokuGrid({
     required this.gridData,
+    required this.cellNotes,
     required this.activeValue,
     required this.activeModifier,
     required this.gridShakeOffset,
@@ -31,6 +32,7 @@ class SudokuGrid extends StatelessWidget {
   });
 
   final SudokuGridData gridData;
+  final List<List<int?>> cellNotes;
   final int activeValue;
   final SudokuModifierType? activeModifier;
   final Offset gridShakeOffset;
@@ -78,6 +80,7 @@ class SudokuGrid extends StatelessWidget {
           final int col = index % 9;
           final bool isHidden = hiddenCellIndices.contains(index);
           final int value = gridData.currentGrid[row][col];
+          final int? noteValue = cellNotes[row][col];
           final int direction = textRotationDirections[index] ?? 1;
           final bool isFixed = gridData.isFixed[row][col];
           final bool isHighlighted = value != 0 && value == activeValue;
@@ -116,10 +119,12 @@ class SudokuGrid extends StatelessWidget {
                       isHintHighlighted: isHintHighlighted,
                     ),
                   ),
-                  child:
-                      value == 0
-                          ? const SizedBox.shrink()
-                          : Transform.rotate(
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: <Widget>[
+                      if (value != 0)
+                        Center(
+                          child: Transform.rotate(
                             angle:
                                 (isRotating90 ? -rotation90Angle : 0) +
                                 (isTextRotating
@@ -141,6 +146,24 @@ class SudokuGrid extends StatelessWidget {
                               ),
                             ),
                           ),
+                        )
+                      else if (noteValue != null)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 6, bottom: 5),
+                          child: Align(
+                            alignment: Alignment.bottomLeft,
+                            child: Text(
+                              '$noteValue',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                                fontWeight: FontWeight.w600,
+                                height: 1,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),

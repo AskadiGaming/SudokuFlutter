@@ -36,6 +36,7 @@
   "sudokuPlayAgain": "Jugar de nuevo",
   "sudokuActionUndo": "Deshacer",
   "sudokuActionDelete": "Borrar",
+  "sudokuActionNote": "Nota",
   "sudokuActionHint": "Pista",
   "sudokuActionAdminSolve": "Resolver",
   "showCompletedSudokus": "Mostrar sudokus completados",

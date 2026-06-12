@@ -132,6 +132,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
   SudokuGridData? _gridData;
   Object? _loadingError;
   int _activeValue = 1;
+  bool _isNoteModeEnabled = false;
   SudokuModifierType? _activeModifier;
   Offset _gridShakeOffset = Offset.zero;
   Size _goatViewportSize = Size.zero;
@@ -161,6 +162,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
   bool _isReplayReady = false;
   Duration _visibleElapsed = Duration.zero;
   final List<_UndoActionGroup> _undoHistory = <_UndoActionGroup>[];
+  List<List<int?>> _cellNotes = _createEmptyCellNotes();
 
   @override
   void initState() {
@@ -243,6 +245,8 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
         _completedSudokuLogged =
             loaded.challengeRoundData?.isCompleted ?? false;
         _isReplayReady = false;
+        _isNoteModeEnabled = false;
+        _cellNotes = _createEmptyCellNotes();
         _undoHistory.clear();
         _hiddenCellIndices.clear();
         _rainDrops.clear();
@@ -374,6 +378,31 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
     });
   }
 
+  void _toggleNoteMode() {
+    if (_isInteractionLocked) {
+      return;
+    }
+    setState(() {
+      _isNoteModeEnabled = !_isNoteModeEnabled;
+      if (_isNoteModeEnabled && _activeValue == 0) {
+        _activeValue = _resolveSelectableActiveValue(
+          preferredValue: 1,
+          grid: _gridData?.currentGrid,
+        );
+      }
+    });
+  }
+
+  void _selectDeleteMode() {
+    if (_isInteractionLocked) {
+      return;
+    }
+    setState(() {
+      _isNoteModeEnabled = false;
+      _activeValue = 0;
+    });
+  }
+
   void _writeActiveNumberToCell(int row, int col) {
     final SudokuGridData? gridData = _gridData;
     if (_isInteractionLocked ||
@@ -382,18 +411,19 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
       return;
     }
 
-    final _GridWriteResult? writeResult = _writeValueToCell(
-      row: row,
-      col: col,
-      nextValue: _activeValue,
-    );
+    final _CellWriteResult? writeResult =
+        _isNoteModeEnabled && _activeValue != 0
+            ? _writeNoteToCell(row: row, col: col, noteValue: _activeValue)
+            : _writeValueToCell(row: row, col: col, nextValue: _activeValue);
     if (writeResult == null) {
       return;
     }
-    _recordUndoGroup(<_GridWriteResult>[writeResult]);
+    _recordUndoGroup(<_CellWriteResult>[writeResult]);
     _logReplayMove(writeResult: writeResult);
     _scheduleChallengeAutosave();
-    _checkSolvedAndMaybeStartFinishSequence();
+    if (writeResult.hasGridChange) {
+      _checkSolvedAndMaybeStartFinishSequence();
+    }
   }
 
   void _updateGoatViewport(Size viewportSize) {
@@ -489,7 +519,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
         'currentValue=${gridData.currentGrid[targetCell.row][targetCell.col]}, '
         'solutionValue=${gridData.solutionGrid[targetCell.row][targetCell.col]}',
       );
-      final _GridWriteResult? writeResult = _writeValueToCell(
+      final _CellWriteResult? writeResult = _writeValueToCell(
         row: targetCell.row,
         col: targetCell.col,
         nextValue: gridData.solutionGrid[targetCell.row][targetCell.col],
@@ -498,7 +528,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
         debugPrint('[hint.flow] writeResult is null, hint was not applied');
         return;
       }
-      _recordUndoGroup(<_GridWriteResult>[writeResult]);
+      _recordUndoGroup(<_CellWriteResult>[writeResult]);
 
       debugPrint(
         '[hint.flow] hint applied: '
@@ -609,13 +639,18 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
       return;
     }
 
-    final List<_GridWriteResult> undoEntries = adminMoves
+    final List<_CellWriteResult> undoEntries = adminMoves
         .map(
           (_AdminReplayMove move) => _GridWriteResult(
             row: move.row,
             col: move.col,
             previousValue: move.previousValue,
             nextValue: move.nextValue,
+            previousNoteValue: _cellNotes[move.row][move.col],
+            nextNoteValue:
+                move.nextValue == _gridData!.solutionGrid[move.row][move.col]
+                    ? null
+                    : _cellNotes[move.row][move.col],
           ),
         )
         .toList(growable: false);
@@ -623,6 +658,9 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
     setState(() {
       for (final _AdminReplayMove move in adminMoves) {
         gridData.currentGrid[move.row][move.col] = move.nextValue;
+        if (move.nextValue == gridData.solutionGrid[move.row][move.col]) {
+          _cellNotes[move.row][move.col] = null;
+        }
       }
       _activeValue = _resolveSelectableActiveValue(
         preferredValue: _activeValue,
@@ -676,12 +714,20 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
     }
 
     final int previousValue = gridData.currentGrid[row][col];
-    if (previousValue == nextValue) {
+    final int? previousNoteValue = _cellNotes[row][col];
+    final int? nextNoteValue =
+        nextValue == gridData.solutionGrid[row][col]
+            ? null
+            : nextValue == 0 && previousValue == 0
+            ? null
+            : previousNoteValue;
+    if (previousValue == nextValue && previousNoteValue == nextNoteValue) {
       return null;
     }
 
     setState(() {
       gridData.currentGrid[row][col] = nextValue;
+      _cellNotes[row][col] = nextNoteValue;
       _activeValue = _resolveSelectableActiveValue(
         preferredValue: _activeValue,
         grid: gridData.currentGrid,
@@ -701,10 +747,47 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
       col: col,
       previousValue: previousValue,
       nextValue: nextValue,
+      previousNoteValue: previousNoteValue,
+      nextNoteValue: nextNoteValue,
     );
   }
 
-  void _logReplayMove({required _GridWriteResult writeResult}) {
+  _NoteWriteResult? _writeNoteToCell({
+    required int row,
+    required int col,
+    required int noteValue,
+  }) {
+    final SudokuGridData? gridData = _gridData;
+    if (gridData == null || noteValue < 1 || noteValue > 9) {
+      return null;
+    }
+    if (gridData.currentGrid[row][col] != 0) {
+      return null;
+    }
+
+    final int? previousNoteValue = _cellNotes[row][col];
+    final int? nextNoteValue =
+        previousNoteValue == noteValue ? null : noteValue;
+    if (previousNoteValue == nextNoteValue) {
+      return null;
+    }
+
+    setState(() {
+      _cellNotes[row][col] = nextNoteValue;
+    });
+
+    return _NoteWriteResult(
+      row: row,
+      col: col,
+      previousNoteValue: previousNoteValue,
+      nextNoteValue: nextNoteValue,
+    );
+  }
+
+  void _logReplayMove({required _CellWriteResult writeResult}) {
+    if (!writeResult.hasGridChange) {
+      return;
+    }
     final DateTime moveTime = DateTime.now();
     unawaited(
       _replayLoggingController.logMove(
@@ -717,7 +800,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
     );
   }
 
-  void _recordUndoGroup(List<_GridWriteResult> writes) {
+  void _recordUndoGroup(List<_CellWriteResult> writes) {
     if (writes.isEmpty) {
       return;
     }
@@ -732,8 +815,9 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
 
     final _UndoActionGroup undoGroup = _undoHistory.removeLast();
     setState(() {
-      for (final _GridWriteResult write in undoGroup.writes.reversed) {
+      for (final _CellWriteResult write in undoGroup.writes.reversed) {
         gridData.currentGrid[write.row][write.col] = write.previousValue;
+        _cellNotes[write.row][write.col] = write.previousNoteValue;
       }
       _activeValue = _resolveSelectableActiveValue(
         preferredValue: _activeValue,
@@ -742,7 +826,10 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
     });
 
     final DateTime actionTime = DateTime.now();
-    for (final _GridWriteResult write in undoGroup.writes.reversed) {
+    for (final _CellWriteResult write in undoGroup.writes.reversed) {
+      if (!write.hasGridChange) {
+        continue;
+      }
       await _replayLoggingController.logMove(
         row: write.row,
         col: write.col,
@@ -1029,6 +1116,7 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
                   children: <Widget>[
                     SudokuGrid(
                       gridData: gridData,
+                      cellNotes: _cellNotes,
                       activeValue: _activeValue,
                       activeModifier: _activeModifier,
                       gridShakeOffset: _gridShakeOffset,
@@ -1057,19 +1145,23 @@ class _PlaySudokuPageState extends State<PlaySudokuPage>
         const SizedBox(height: 16),
         SudokuActionBar(
           isDeleteModeSelected: _activeValue == 0,
+          isNoteModeSelected: _isNoteModeEnabled,
           canUndo: _canUndo,
           canSelectDeleteMode: !_isInteractionLocked,
+          canSelectNoteMode: !_isInteractionLocked,
           canRequestHint: _canRequestHint,
           isHintLoading: _isHintRequestInProgress,
           showAdminSolve: _isAdminSolveButtonEnabled,
           canUseAdminSolve: !_isInteractionLocked && !_isSolved,
           undoLabel: l10n?.sudokuActionUndo ?? 'Zurueck',
           deleteLabel: l10n?.sudokuActionDelete ?? 'Loeschen',
+          noteLabel: l10n?.sudokuActionNote ?? 'Notiz',
           hintLabel: l10n?.sudokuActionHint ?? 'Hinweis',
           adminSolveLabel: l10n?.sudokuActionAdminSolve ?? 'Loesen',
           onUndo: _canUndo ? _undoLastAction : null,
           onDeleteModeSelected:
-              !_isInteractionLocked ? () => _setActiveValue(0) : null,
+              !_isInteractionLocked ? _selectDeleteMode : null,
+          onNoteModeSelected: !_isInteractionLocked ? _toggleNoteMode : null,
           onHint: _canRequestHint ? _requestHint : null,
           onAdminSolve:
               (_gridData == null || _isInteractionLocked || _isSolved)
@@ -1392,24 +1484,58 @@ class _HintTargetCell {
   int get index => (row * 9) + col;
 }
 
-class _GridWriteResult {
-  const _GridWriteResult({
+List<List<int?>> _createEmptyCellNotes() {
+  return List<List<int?>>.generate(
+    9,
+    (_) => List<int?>.filled(9, null),
+    growable: false,
+  );
+}
+
+abstract class _CellWriteResult {
+  const _CellWriteResult({
     required this.row,
     required this.col,
     required this.previousValue,
     required this.nextValue,
+    required this.previousNoteValue,
+    required this.nextNoteValue,
   });
 
   final int row;
   final int col;
   final int previousValue;
   final int nextValue;
+  final int? previousNoteValue;
+  final int? nextNoteValue;
+
+  bool get hasGridChange => previousValue != nextValue;
+}
+
+class _GridWriteResult extends _CellWriteResult {
+  const _GridWriteResult({
+    required super.row,
+    required super.col,
+    required super.previousValue,
+    required super.nextValue,
+    required super.previousNoteValue,
+    required super.nextNoteValue,
+  }) : super();
+}
+
+class _NoteWriteResult extends _CellWriteResult {
+  const _NoteWriteResult({
+    required super.row,
+    required super.col,
+    required super.previousNoteValue,
+    required super.nextNoteValue,
+  }) : super(previousValue: 0, nextValue: 0);
 }
 
 class _UndoActionGroup {
   const _UndoActionGroup({required this.writes});
 
-  final List<_GridWriteResult> writes;
+  final List<_CellWriteResult> writes;
 }
 
 class _InMemorySudokuReplayRepository implements SudokuReplayRepository {

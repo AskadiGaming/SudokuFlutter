@@ -36,6 +36,7 @@
   "sudokuPlayAgain": "Rejouer",
   "sudokuActionUndo": "Annuler",
   "sudokuActionDelete": "Effacer",
+  "sudokuActionNote": "Note",
   "sudokuActionHint": "Indice",
   "sudokuActionAdminSolve": "Resoudre",
   "showCompletedSudokus": "Afficher les sudokus termines",

@@ -28,6 +28,12 @@ class CompletedSudokuReplayPage extends StatefulWidget {
 
 class _CompletedSudokuReplayPageState extends State<CompletedSudokuReplayPage>
     with TickerProviderStateMixin {
+  static final List<List<int?>> _emptyCellNotes = List<List<int?>>.generate(
+    9,
+    (_) => List<int?>.filled(9, null),
+    growable: false,
+  );
+
   late final SudokuReplayRepository _repository =
       widget.repository ?? LocalSudokuReplayRepository();
   late final AnimationController _rotationController = AnimationController(
@@ -139,6 +145,7 @@ class _CompletedSudokuReplayPageState extends State<CompletedSudokuReplayPage>
                           aspectRatio: 1,
                           child: SudokuGrid(
                             gridData: gridData,
+                            cellNotes: _emptyCellNotes,
                             activeValue: 0,
                             activeModifier: null,
                             gridShakeOffset: Offset.zero,
