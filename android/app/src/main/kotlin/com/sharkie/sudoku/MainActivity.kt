@@ -1,4 +1,4 @@
-package com.example.hello_world_app
+package com.sharkie.sudoku
 
 import io.flutter.embedding.android.FlutterActivity
 
