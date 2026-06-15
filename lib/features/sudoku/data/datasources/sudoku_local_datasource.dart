@@ -1,17 +1,20 @@
-import 'package:flutter/services.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../../../../core/database/app_database.dart';
 import '../../domain/sudoku_difficulty.dart';
+import '../services/sudoku_seed_service.dart';
+
+export '../services/sudoku_seed_parser.dart' show parseSudokuLines;
 
 class SudokuLocalDataSource {
-  SudokuLocalDataSource({AppDatabase? appDatabase, AssetBundle? assetBundle})
-    : _appDatabase = appDatabase ?? AppDatabase.instance,
-      _assetBundle = assetBundle ?? rootBundle;
+  SudokuLocalDataSource({
+    AppDatabase? appDatabase,
+    SudokuSeedService? seedService,
+  }) : _appDatabase = appDatabase ?? AppDatabase.instance,
+       _seedService = seedService ?? SudokuSeedService.instance;
 
   final AppDatabase _appDatabase;
-  final AssetBundle _assetBundle;
-  Future<void>? _seedFuture;
+  final SudokuSeedService _seedService;
 
   Future<String> getRandomByDifficulty(SudokuDifficulty difficulty) async {
     await ensureSeeded();
@@ -80,56 +83,7 @@ class SudokuLocalDataSource {
   }
 
   Future<void> ensureSeeded() async {
-    final Future<void>? existingFuture = _seedFuture;
-    if (existingFuture != null) {
-      return existingFuture;
-    }
-    final Future<void> seedFuture = _seedIfNeeded();
-    _seedFuture = seedFuture;
-    return seedFuture;
-  }
-
-  Future<void> _seedIfNeeded() async {
-    final Database db = await _appDatabase.database;
-    final int existingCount =
-        Sqflite.firstIntValue(
-          await db.rawQuery('SELECT COUNT(*) FROM sudoku'),
-        ) ??
-        0;
-    if (existingCount > 0) {
-      return;
-    }
-
-    final Map<SudokuDifficulty, List<String>> puzzlesByDifficulty =
-        <SudokuDifficulty, List<String>>{};
-    for (final SudokuDifficulty difficulty in SudokuDifficulty.values) {
-      final String fileContent = await _assetBundle.loadString(
-        _assetPathForDifficulty(difficulty),
-      );
-      puzzlesByDifficulty[difficulty] = parseSudokuLines(fileContent);
-    }
-
-    await db.transaction((Transaction txn) async {
-      for (final SudokuDifficulty difficulty in SudokuDifficulty.values) {
-        final List<String> puzzles = puzzlesByDifficulty[difficulty]!;
-        final Batch batch = txn.batch();
-        int level = 1;
-        for (final String puzzle in puzzles) {
-          batch.insert('sudoku', <String, Object?>{
-            'level': level,
-            'difficulty': difficulty.storageValue,
-            'sudoku_string': puzzle,
-            'daily': null,
-          });
-          level++;
-        }
-        await batch.commit(noResult: true);
-      }
-    });
-  }
-
-  String _assetPathForDifficulty(SudokuDifficulty difficulty) {
-    return 'assets/sudoku/${difficulty.storageValue}.txt';
+    await _seedService.ensureSeeded();
   }
 
   String _toIsoDate(DateTime date) {
@@ -138,27 +92,4 @@ class SudokuLocalDataSource {
     final String day = date.day.toString().padLeft(2, '0');
     return '$year-$month-$day';
   }
-}
-
-List<String> parseSudokuLines(String content) {
-  final List<String> puzzles = <String>[];
-  final List<String> lines = content.split(RegExp(r'\r?\n'));
-  for (int i = 0; i < lines.length; i++) {
-    final String candidate = lines[i].trim();
-    if (candidate.isEmpty) {
-      continue;
-    }
-    if (candidate.length != 81) {
-      throw FormatException(
-        'Sudoku line ${i + 1} must contain exactly 81 characters, got ${candidate.length}.',
-      );
-    }
-    if (!RegExp(r'^[0-9]{81}$').hasMatch(candidate)) {
-      throw FormatException(
-        'Sudoku line ${i + 1} may only contain digits 0-9.',
-      );
-    }
-    puzzles.add(candidate);
-  }
-  return puzzles;
 }
